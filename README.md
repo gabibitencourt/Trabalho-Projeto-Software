@@ -17,4 +17,4 @@ Repositório do trabalho prático da disciplina de Projeto de Software (2026.2)
    - Windows: `.\venv\Scripts\activate`
    - Linux/Mac: `source venv/bin/activate`
 2. Instalar dependências: `pip install -r requirements.txt`
-3. Executar os testes: `pytest`
+3. Executar os testes: `PYTHONPATH=src python -m pytest`
