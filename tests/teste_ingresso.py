@@ -1,20 +1,21 @@
-from entitys import Ingresso
+from entitys.LoteDeIngresso import Ingresso
+import pytest
     
-def teste_ingresso(nome, preco, quant_total, quant_vendida=0):
-    ingresso = Ingresso(nome, preco, quant_total, quant_vendida)
-    for i in range(0, quant_total+1): # Consigo vender mais ingresso que quant_total?
-        try:
+def teste_caminho_feliz(): # Caminho feliz
+    ingresso = Ingresso("Junqueira", 15, 20)
+    for i in range(0, ingresso.quant_total):
+        ingresso.venda()
+    
+def teste_limite_venda(): # Consigo vender mais ingresso que quant_total?
+    ingresso = Ingresso("Junqueira", 15, 20)
+    with pytest.raises(Exception):
+        for i in range(0, ingresso.quant_total+1): 
             ingresso.venda()
-        except Exception as e:
-            print(e)
 
+def teste_valores_negativos(): # Erro do usuário ou de outra função, valores negativos
+    with pytest.raises(Exception):
+        Ingresso("Matoso", -20, -12, -5)
 
-teste_ingresso("Junqueira", 15, 20) # Caminho feliz
-try:
-    teste_ingresso("Queiroz", 40, 20, 50) # Consigo criar um evento que vendeu mais do que tem pra vender?
-except Exception as e:
-    print(e)
-try:
-    teste_ingresso("Matoso", -20, -12, -5) # Valores negativos devem ser tratados, possível erro do usuário.
-except Exception as e:
-    print(e)
+def teste_quant_vendido_invalida(): # Consigo criar um evento que vendeu mais do que tinha pra vender?
+    with pytest.raises(Exception): 
+        Ingresso("Queiroz", 40, 20, 50)
