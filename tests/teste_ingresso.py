@@ -19,5 +19,3 @@ def teste_valores_negativos(): # Erro do usuário ou de outra função, valores 
 def teste_quant_vendido_invalida(): # Consigo criar um evento que vendeu mais do que tinha pra vender?
     with pytest.raises(Exception): 
         LoteDeIngresso("Queiroz", 40, 20, 50)
-
-teste = LoteDeIngresso("matoso",)

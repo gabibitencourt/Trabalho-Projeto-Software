@@ -11,10 +11,7 @@ class LoteDeIngresso:
         self.quant_vendida = quant_vendida
 
     def __str__(self):
-            return f"""nome: {self.nome}
-            preco: {self.preco}
-            quantidade total: {self.quant_total}
-            quantidade vendida: {self.quant_vendida}"""
+            return f"nome: {self.nome}\npreco: {self.preco}\nquantidade total: {self.quant_total}\nquantidade vendida: {self.quant_vendida}"
 
     def venda(self):
         if self.quant_vendida == self.quant_total:
