@@ -1,5 +1,6 @@
 from enum import Enum
-
+from dataclasses import dataclass
+from datetime import datetime
 
 class StatusEvento(Enum):
 	PLANEJADO = "planejado"
@@ -16,6 +17,9 @@ class StatusInscricao(Enum):
 class OperacaoInvalidaError(Exception):
 	pass
 
+@dataclass(frozen=True)
+class CheckIn:
+    data_hora: datetime
 
 class Evento:
 	def __init__(self, identificador, nome, data, local, status):
@@ -57,7 +61,7 @@ class Inscricao:
 		self.participante = participante
 		self.lote = lote
 		self.status = StatusInscricao.PENDENTE
-		self.checkin_realizado = False
+		self.checkin = None
 
 	def confirmar(self):
 		if self.status is not StatusInscricao.PENDENTE:
@@ -65,15 +69,15 @@ class Inscricao:
 		self.status = StatusInscricao.CONFIRMADA
 
 	def cancelar(self):
-		if self.checkin_realizado:
+		if self.checkin is not None:
 			raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
 		if self.status is StatusInscricao.CANCELADA:
 			raise OperacaoInvalidaError("inscricao ja esta cancelada")
 		self.status = StatusInscricao.CANCELADA
 
-	def realizar_checkin(self):
+	def realizar_checkin(self, data_hora=None):
 		if self.status is not StatusInscricao.CONFIRMADA:
 			raise OperacaoInvalidaError("check-in exige inscricao confirmada")
-		if self.checkin_realizado:
+		if self.checkin is not None:
 			raise OperacaoInvalidaError("check-in ja realizado")
-		self.checkin_realizado = True
+		self.checkin = CheckIn(data_hora=data_hora or datetime.now())
