@@ -7,6 +7,12 @@ class StatusEvento(Enum):
 	ENCERRADO = "encerrado"
 
 
+class StatusInscricao(Enum):
+	PENDENTE = "pendente"
+	CONFIRMADA = "confirmada"
+	CANCELADA = "cancelada"
+
+
 class OperacaoInvalidaError(Exception):
 	pass
 
@@ -43,3 +49,31 @@ class Evento:
 			raise OperacaoInvalidaError(
 				"nao e possivel alterar lotes de evento em andamento ou encerrado"
 			)
+
+
+class Inscricao:
+	def __init__(self, identificador, participante, lote):
+		self.identificador = identificador
+		self.participante = participante
+		self.lote = lote
+		self.status = StatusInscricao.PENDENTE
+		self.checkin_realizado = False
+
+	def confirmar(self):
+		if self.status is not StatusInscricao.PENDENTE:
+			raise OperacaoInvalidaError("inscricao nao pode ser confirmada")
+		self.status = StatusInscricao.CONFIRMADA
+
+	def cancelar(self):
+		if self.checkin_realizado:
+			raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
+		if self.status is StatusInscricao.CANCELADA:
+			raise OperacaoInvalidaError("inscricao ja esta cancelada")
+		self.status = StatusInscricao.CANCELADA
+
+	def realizar_checkin(self):
+		if self.status is not StatusInscricao.CONFIRMADA:
+			raise OperacaoInvalidaError("check-in exige inscricao confirmada")
+		if self.checkin_realizado:
+			raise OperacaoInvalidaError("check-in ja realizado")
+		self.checkin_realizado = True
