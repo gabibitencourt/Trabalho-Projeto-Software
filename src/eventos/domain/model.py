@@ -13,6 +13,13 @@ class StatusInscricao(Enum):
 	CANCELADA = "cancelada"
 
 
+class StatusPagamento(Enum):
+	PENDENTE = "pendente"
+	APROVADO = "aprovado"
+	RECUSADO = "recusado"
+	ESTORNADO = "estornado"
+
+
 class OperacaoInvalidaError(Exception):
 	pass
 
