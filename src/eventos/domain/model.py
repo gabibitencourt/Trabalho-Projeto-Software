@@ -84,3 +84,32 @@ class Inscricao:
 		if self.checkin_realizado:
 			raise OperacaoInvalidaError("check-in ja realizado")
 		self.checkin_realizado = True
+
+
+class Pagamento:
+	def __init__(self, identificador, inscricao, valor, status=StatusPagamento.PENDENTE):
+		self.identificador = identificador
+		self.inscricao = inscricao
+		self.valor = valor
+		self.status = status
+
+	def aprovar(self):
+		if self.status is StatusPagamento.APROVADO:
+			raise OperacaoInvalidaError("pagamento aprovado nao pode ser reprocessado")
+		if self.status is not StatusPagamento.PENDENTE:
+			raise OperacaoInvalidaError("apenas pagamento pendente pode ser aprovado")
+		self.status = StatusPagamento.APROVADO
+
+	def recusar(self):
+		if self.status is not StatusPagamento.PENDENTE:
+			raise OperacaoInvalidaError("apenas pagamento pendente pode ser recusado")
+		self.status = StatusPagamento.RECUSADO
+
+	def estornar(self):
+		if self.status is not StatusPagamento.APROVADO:
+			raise OperacaoInvalidaError("apenas pagamento aprovado pode ser estornado")
+		if self.inscricao.checkin_realizado:
+			raise OperacaoInvalidaError(
+				"nao e possivel estornar pagamento de inscricao com check-in"
+			)
+		self.status = StatusPagamento.ESTORNADO
