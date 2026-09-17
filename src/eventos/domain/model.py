@@ -1,18 +1,21 @@
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
+import re
 
 class StatusEvento(Enum):
 	PLANEJADO = "planejado"
 	EM_ANDAMENTO = "em andamento"
 	ENCERRADO = "encerrado"
 
-
 class StatusInscricao(Enum):
 	PENDENTE = "pendente"
 	CONFIRMADA = "confirmada"
 	CANCELADA = "cancelada"
 
+class RoleOrganizador(Enum):
+    ADMIN = "admin"
+    ORGANIZADOR = "organizador"
 
 class OperacaoInvalidaError(Exception):
 	pass
@@ -46,14 +49,11 @@ class Evento:
 				return
 		raise OperacaoInvalidaError("lote nao encontrado")
 
-
-
 	def _exigir_evento_planejado(self):
 		if self.status is not StatusEvento.PLANEJADO:
 			raise OperacaoInvalidaError(
 				"nao e possivel alterar lotes de evento em andamento ou encerrado"
 			)
-
 
 class Inscricao:
 	def __init__(self, identificador, participante, lote):
@@ -81,3 +81,45 @@ class Inscricao:
 		if self.checkin is not None:
 			raise OperacaoInvalidaError("check-in ja realizado")
 		self.checkin = CheckIn(data_hora=data_hora or datetime.now())
+
+class Participante:
+
+    def __init__(self, identificador, nome, email, documento):
+        if not nome or not nome.strip():
+            raise ValueError("nome obrigatorio")
+
+        doc_limpo = re.sub(r"\D", "", documento or "")
+        if len(doc_limpo) not in (11, 14):
+            raise ValueError("documento invalido")
+
+        if not email or "@" not in email:
+            raise ValueError("email invalido")
+
+        self.identificador = identificador
+        self.nome = nome.strip()
+        self.email = email.lower().strip()
+        self.documento = doc_limpo
+
+    def alterar_email(self, novo_email):
+        if not novo_email or "@" not in novo_email:
+            raise ValueError("email invalido")
+        self.email = novo_email.lower().strip()
+
+class Organizador:
+
+    def __init__(
+        self, identificador, nome, email, role=RoleOrganizador.ORGANIZADOR
+    ):
+        if not nome or not nome.strip():
+            raise ValueError("nome obrigatorio")
+
+        if not email or "@" not in email:
+            raise ValueError("email invalido")
+
+        if not isinstance(role, RoleOrganizador):
+            raise ValueError("role invalida")
+
+        self.identificador = identificador
+        self.nome = nome.strip()
+        self.email = email.lower().strip()
+        self.role = role
