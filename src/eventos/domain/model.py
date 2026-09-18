@@ -62,32 +62,56 @@ class Evento:
 				"nao e possivel alterar lotes de evento em andamento ou encerrado"
 			)
 
+	def iniciar(self):
+		if self.status is StatusEvento.EM_ANDAMENTO:
+			raise OperacaoInvalidaError("evento ja esta em andamento")
+		if self.status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		self.status = StatusEvento.EM_ANDAMENTO
+
+	def encerrar(self, inscricoes_pendentes):
+		if inscricoes_pendentes < 0:
+			raise ValueError("a quantidade de inscricoes pendentes nao pode ser negativa")
+		if self.status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		if inscricoes_pendentes > 0:
+			raise OperacaoInvalidaError(
+				"nao e possivel encerrar evento com inscricoes pendentes"
+			)
+		self.status = StatusEvento.ENCERRADO
+
 class Inscricao:
-	def __init__(self, identificador, participante, lote):
-		self.identificador = identificador
-		self.participante = participante
-		self.lote = lote
-		self.status = StatusInscricao.PENDENTE
-		self.checkin = None
+    def __init__(self, identificador, participante, lote):
+        self.identificador = identificador
+        self.participante = participante
+        self.lote = lote
+        self.status = StatusInscricao.PENDENTE
+        self.checkin = None
 
-	def confirmar(self):
-		if self.status is not StatusInscricao.PENDENTE:
-			raise OperacaoInvalidaError("inscricao nao pode ser confirmada")
-		self.status = StatusInscricao.CONFIRMADA
+    @property
+    def checkin_realizado(self) -> bool:
+        return self.checkin is not None
 
-	def cancelar(self):
-		if self.checkin is not None:
-			raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
-		if self.status is StatusInscricao.CANCELADA:
-			raise OperacaoInvalidaError("inscricao ja esta cancelada")
-		self.status = StatusInscricao.CANCELADA
+    def confirmar(self):
+        if self.status is not StatusInscricao.PENDENTE:
+            raise OperacaoInvalidaError("inscricao nao pode ser confirmada")
+        self.status = StatusInscricao.CONFIRMADA
 
-	def realizar_checkin(self, data_hora=None):
-		if self.status is not StatusInscricao.CONFIRMADA:
-			raise OperacaoInvalidaError("check-in exige inscricao confirmada")
-		if self.checkin is not None:
-			raise OperacaoInvalidaError("check-in ja realizado")
-		self.checkin_realizado = True
+    def cancelar(self):
+        if self.checkin is not None:
+            raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
+        if self.status is StatusInscricao.CANCELADA:
+            raise OperacaoInvalidaError("inscricao ja esta cancelada")
+        self.status = StatusInscricao.CANCELADA
+
+    def realizar_checkin(self, data_hora=None) -> CheckIn:
+        if self.status is not StatusInscricao.CONFIRMADA:
+            raise OperacaoInvalidaError("check-in exige inscricao confirmada")
+        if self.checkin is not None:
+            raise OperacaoInvalidaError("check-in ja realizado")
+            
+        self.checkin = CheckIn(data_hora=data_hora or datetime.now())
+        return self.checkin
 
 
 class Pagamento:
@@ -117,8 +141,6 @@ class Pagamento:
 				"nao e possivel estornar pagamento de inscricao com check-in"
 			)
 		self.status = StatusPagamento.ESTORNADO
-
-		self.checkin = CheckIn(data_hora=data_hora or datetime.now())
 
 class Participante:
 

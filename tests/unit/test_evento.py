@@ -94,3 +94,67 @@ def test_nao_adiciona_lote_quando_evento_esta_encerrado():
     with pytest.raises(OperacaoInvalidaError):
         evento.adicionar_lote(LoteFake())
 
+def test_iniciar_evento_muda_status_para_em_andamento():
+    evento = criar_evento()
+
+    evento.iniciar()
+
+    assert evento.status is StatusEvento.EM_ANDAMENTO
+
+
+def test_nao_inicia_evento_que_ja_esta_em_andamento():
+    evento = criar_evento(StatusEvento.EM_ANDAMENTO)
+
+    with pytest.raises(
+        OperacaoInvalidaError,
+        match="ja esta em andamento",
+    ):
+        evento.iniciar()
+
+    assert evento.status is StatusEvento.EM_ANDAMENTO
+
+
+def test_nao_encerra_evento_com_inscricoes_pendentes():
+    evento = criar_evento(StatusEvento.EM_ANDAMENTO)
+
+    with pytest.raises(OperacaoInvalidaError):
+        evento.encerrar(inscricoes_pendentes=1)
+
+    assert evento.status is StatusEvento.EM_ANDAMENTO
+
+
+def test_encerrar_evento_sem_inscricoes_pendentes():
+    evento = criar_evento(StatusEvento.EM_ANDAMENTO)
+
+    evento.encerrar(inscricoes_pendentes=0)
+
+    assert evento.status is StatusEvento.ENCERRADO
+
+
+def test_nao_encerra_evento_que_ja_esta_encerrado():
+    evento = criar_evento(StatusEvento.ENCERRADO)
+
+    with pytest.raises(OperacaoInvalidaError, match="ja esta encerrado"):
+        evento.encerrar(inscricoes_pendentes=0)
+
+    assert evento.status is StatusEvento.ENCERRADO
+
+
+def test_encerrar_evento_rejeita_quantidade_de_inscricoes_invalida():
+    evento = criar_evento(StatusEvento.EM_ANDAMENTO)
+
+    with pytest.raises(ValueError):
+        evento.encerrar(inscricoes_pendentes=-1)
+
+    assert evento.status is StatusEvento.EM_ANDAMENTO
+    
+    
+    
+    
+def test_nao_inicia_evento_encerrado():
+    evento = criar_evento(StatusEvento.ENCERRADO)
+
+    with pytest.raises(OperacaoInvalidaError):
+        evento.iniciar()
+
+
