@@ -1,5 +1,3 @@
 pytest
 sqlalchemy
-fastapi
-uvicorn
-httpx
+flask
