@@ -125,12 +125,12 @@ Nenhuma.
 ### Lucas Paixao de Lima Costa (@LucasLimmm2000)
 
 #### Checkpoint 1 (Semana 2) - Modelo de Domínio
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:** 
+- **Arquivos sob minha responsabilidade:** src/eventos/domain/model.py (StatusPagamento e Pagamento), tests/unit/test_pagamento.py
+- **Intervalo/Hashes de Commits:** 81c04b0, a395bf9, 4afea2c
+- **O que implementei:** Classe Pagamento com status (pendente, aprovado, recusado, estornado) e os metodos aprovar, recusar e estornar. Nao deixa aprovar pagamento duas vezes, so aprova/recusa se estiver pendente, e nao deixa estornar se a inscricao ja fez check-in. Fiz 9 testes cobrindo isso.
+- **Justificativa de decisão de projeto:** Usei enum pra status em vez de string pra nao deixar valor errado entrar. A regra do check-in fica dentro do Pagamento mesmo, porque ele ja tem acesso a inscricao.
 - **Uso de IA Generativa (conforme Seção 2.5):** 
-- **Simplificações conscientes:** 
+- **Simplificações conscientes:** Pagamento ainda usa a Inscricao direto em memoria, sem repositorio/banco.
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
 - **Arquivos sob minha responsabilidade:**
