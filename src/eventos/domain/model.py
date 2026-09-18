@@ -63,31 +63,37 @@ class Evento:
 			)
 
 class Inscricao:
-	def __init__(self, identificador, participante, lote):
-		self.identificador = identificador
-		self.participante = participante
-		self.lote = lote
-		self.status = StatusInscricao.PENDENTE
-		self.checkin = None
+    def __init__(self, identificador, participante, lote):
+        self.identificador = identificador
+        self.participante = participante
+        self.lote = lote
+        self.status = StatusInscricao.PENDENTE
+        self.checkin = None
 
-	def confirmar(self):
-		if self.status is not StatusInscricao.PENDENTE:
-			raise OperacaoInvalidaError("inscricao nao pode ser confirmada")
-		self.status = StatusInscricao.CONFIRMADA
+    @property
+    def checkin_realizado(self) -> bool:
+        return self.checkin is not None
 
-	def cancelar(self):
-		if self.checkin is not None:
-			raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
-		if self.status is StatusInscricao.CANCELADA:
-			raise OperacaoInvalidaError("inscricao ja esta cancelada")
-		self.status = StatusInscricao.CANCELADA
+    def confirmar(self):
+        if self.status is not StatusInscricao.PENDENTE:
+            raise OperacaoInvalidaError("inscricao nao pode ser confirmada")
+        self.status = StatusInscricao.CONFIRMADA
 
-	def realizar_checkin(self, data_hora=None):
-		if self.status is not StatusInscricao.CONFIRMADA:
-			raise OperacaoInvalidaError("check-in exige inscricao confirmada")
-		if self.checkin is not None:
-			raise OperacaoInvalidaError("check-in ja realizado")
-		self.checkin_realizado = True
+    def cancelar(self):
+        if self.checkin is not None:
+            raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
+        if self.status is StatusInscricao.CANCELADA:
+            raise OperacaoInvalidaError("inscricao ja esta cancelada")
+        self.status = StatusInscricao.CANCELADA
+
+    def realizar_checkin(self, data_hora=None) -> CheckIn:
+        if self.status is not StatusInscricao.CONFIRMADA:
+            raise OperacaoInvalidaError("check-in exige inscricao confirmada")
+        if self.checkin is not None:
+            raise OperacaoInvalidaError("check-in ja realizado")
+            
+        self.checkin = CheckIn(data_hora=data_hora or datetime.now())
+        return self.checkin
 
 
 class Pagamento:
@@ -117,8 +123,6 @@ class Pagamento:
 				"nao e possivel estornar pagamento de inscricao com check-in"
 			)
 		self.status = StatusPagamento.ESTORNADO
-
-		self.checkin = CheckIn(data_hora=data_hora or datetime.now())
 
 class Participante:
 
