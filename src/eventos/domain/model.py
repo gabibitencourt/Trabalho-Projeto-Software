@@ -1,11 +1,12 @@
 from enum import Enum
-
+from dataclasses import dataclass
+from datetime import datetime
+import re
 
 class StatusEvento(Enum):
 	PLANEJADO = "planejado"
 	EM_ANDAMENTO = "em andamento"
 	ENCERRADO = "encerrado"
-
 
 class StatusInscricao(Enum):
 	PENDENTE = "pendente"
@@ -19,10 +20,16 @@ class StatusPagamento(Enum):
 	RECUSADO = "recusado"
 	ESTORNADO = "estornado"
 
+class RoleOrganizador(Enum):
+    ADMIN = "admin"
+    ORGANIZADOR = "organizador"
 
 class OperacaoInvalidaError(Exception):
 	pass
 
+@dataclass(frozen=True)
+class CheckIn:
+    data_hora: datetime
 
 class Evento:
 	def __init__(self, identificador, nome, data, local, status):
@@ -49,41 +56,62 @@ class Evento:
 				return
 		raise OperacaoInvalidaError("lote nao encontrado")
 
-
-
 	def _exigir_evento_planejado(self):
 		if self.status is not StatusEvento.PLANEJADO:
 			raise OperacaoInvalidaError(
 				"nao e possivel alterar lotes de evento em andamento ou encerrado"
 			)
 
+	def iniciar(self):
+		if self.status is StatusEvento.EM_ANDAMENTO:
+			raise OperacaoInvalidaError("evento ja esta em andamento")
+		if self.status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		self.status = StatusEvento.EM_ANDAMENTO
+
+	def encerrar(self, inscricoes_pendentes):
+		if inscricoes_pendentes < 0:
+			raise ValueError("a quantidade de inscricoes pendentes nao pode ser negativa")
+		if self.status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		if inscricoes_pendentes > 0:
+			raise OperacaoInvalidaError(
+				"nao e possivel encerrar evento com inscricoes pendentes"
+			)
+		self.status = StatusEvento.ENCERRADO
 
 class Inscricao:
-	def __init__(self, identificador, participante, lote):
-		self.identificador = identificador
-		self.participante = participante
-		self.lote = lote
-		self.status = StatusInscricao.PENDENTE
-		self.checkin_realizado = False
+    def __init__(self, identificador, participante, lote):
+        self.identificador = identificador
+        self.participante = participante
+        self.lote = lote
+        self.status = StatusInscricao.PENDENTE
+        self.checkin = None
 
-	def confirmar(self):
-		if self.status is not StatusInscricao.PENDENTE:
-			raise OperacaoInvalidaError("inscricao nao pode ser confirmada")
-		self.status = StatusInscricao.CONFIRMADA
+    @property
+    def checkin_realizado(self) -> bool:
+        return self.checkin is not None
 
-	def cancelar(self):
-		if self.checkin_realizado:
-			raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
-		if self.status is StatusInscricao.CANCELADA:
-			raise OperacaoInvalidaError("inscricao ja esta cancelada")
-		self.status = StatusInscricao.CANCELADA
+    def confirmar(self):
+        if self.status is not StatusInscricao.PENDENTE:
+            raise OperacaoInvalidaError("inscricao nao pode ser confirmada")
+        self.status = StatusInscricao.CONFIRMADA
 
-	def realizar_checkin(self):
-		if self.status is not StatusInscricao.CONFIRMADA:
-			raise OperacaoInvalidaError("check-in exige inscricao confirmada")
-		if self.checkin_realizado:
-			raise OperacaoInvalidaError("check-in ja realizado")
-		self.checkin_realizado = True
+    def cancelar(self):
+        if self.checkin is not None:
+            raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
+        if self.status is StatusInscricao.CANCELADA:
+            raise OperacaoInvalidaError("inscricao ja esta cancelada")
+        self.status = StatusInscricao.CANCELADA
+
+    def realizar_checkin(self, data_hora=None) -> CheckIn:
+        if self.status is not StatusInscricao.CONFIRMADA:
+            raise OperacaoInvalidaError("check-in exige inscricao confirmada")
+        if self.checkin is not None:
+            raise OperacaoInvalidaError("check-in ja realizado")
+            
+        self.checkin = CheckIn(data_hora=data_hora or datetime.now())
+        return self.checkin
 
 
 class Pagamento:
@@ -113,3 +141,45 @@ class Pagamento:
 				"nao e possivel estornar pagamento de inscricao com check-in"
 			)
 		self.status = StatusPagamento.ESTORNADO
+
+class Participante:
+
+    def __init__(self, identificador, nome, email, documento):
+        if not nome or not nome.strip():
+            raise ValueError("nome obrigatorio")
+
+        doc_limpo = re.sub(r"\D", "", documento or "")
+        if len(doc_limpo) not in (11, 14):
+            raise ValueError("documento invalido")
+
+        if not email or "@" not in email:
+            raise ValueError("email invalido")
+
+        self.identificador = identificador
+        self.nome = nome.strip()
+        self.email = email.lower().strip()
+        self.documento = doc_limpo
+
+    def alterar_email(self, novo_email):
+        if not novo_email or "@" not in novo_email:
+            raise ValueError("email invalido")
+        self.email = novo_email.lower().strip()
+
+class Organizador:
+
+    def __init__(
+        self, identificador, nome, email, role=RoleOrganizador.ORGANIZADOR
+    ):
+        if not nome or not nome.strip():
+            raise ValueError("nome obrigatorio")
+
+        if not email or "@" not in email:
+            raise ValueError("email invalido")
+
+        if not isinstance(role, RoleOrganizador):
+            raise ValueError("role invalida")
+
+        self.identificador = identificador
+        self.nome = nome.strip()
+        self.email = email.lower().strip()
+        self.role = role

@@ -1,6 +1,8 @@
+from datetime import datetime
 import pytest
 
 from eventos.domain.model import (
+    CheckIn,
     Inscricao,
     OperacaoInvalidaError,
     StatusInscricao,
@@ -19,7 +21,7 @@ def test_inscricao_inicia_pendente():
     inscricao = criar_inscricao()
 
     assert inscricao.status is StatusInscricao.PENDENTE
-    assert not inscricao.checkin_realizado
+    assert inscricao.checkin is None
 
 
 def test_confirma_inscricao_pendente():
@@ -44,7 +46,18 @@ def test_realiza_checkin_de_inscricao_confirmada():
 
     inscricao.realizar_checkin()
 
-    assert inscricao.checkin_realizado
+    assert inscricao.checkin is not None
+    assert isinstance(inscricao.checkin, CheckIn)
+    assert isinstance(inscricao.checkin.data_hora, datetime)
+
+def test_realiza_checkin_com_data_hora_especifica():
+    inscricao = criar_inscricao()
+    inscricao.confirmar()
+    data_customizada = datetime(2026, 9, 16, 20, 0, 0)
+
+    inscricao.realizar_checkin(data_hora=data_customizada)
+
+    assert inscricao.checkin.data_hora == data_customizada
 
 
 def test_nao_realiza_checkin_de_inscricao_pendente():

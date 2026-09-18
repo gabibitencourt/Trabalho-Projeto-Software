@@ -4,12 +4,12 @@ Repositório do trabalho prático da disciplina de Projeto de Software (2026.2)
 ## Quem faz o quê
 | Integrante | Usuário GitHub | Responsabilidade / Agregado |
 |---|---|---|
-| Arthur Siqueira Campos Alexandrino | @devalexandrino | a definir |
-| Felipe Gomes de Mello | @FelipeGMello | a definir |
-| Gabriela Bitencourt Freire da Silva | @gabibitencourt | a definir |
-| João Marcello da Costa | @JoaoMarcelloCosta2000 | a definir |
-| Lucas Paixao de Lima Costa | @LucasLimmm2000 | a definir |
-| Samuel Carvalho Dias | @SamuelCDiias | a definir |
+| Arthur Siqueira Campos Alexandrino | @devalexandrino | Agregado Evento — Classe `Evento`|
+| Felipe Gomes de Mello | @FelipeGMello | Agregado Evento — Classe `Lote` |
+| Gabriela Bitencourt Freire da Silva | @gabibitencourt | Agregado Inscrição  — Classes `Participante` e `Organizador` |
+| João Marcello da Costa | @JoaoMarcelloCosta2000 | Agregado Pagamento — Classe `Checkin` |
+| Lucas Paixao de Lima Costa | @LucasLimmm2000 | Agregado Pagamento — Classe `Pagamento` |
+| Samuel Carvalho Dias | @SamuelCDiias | Agregado Inscrição — Classe `Inscricao` |
 
 ## Como rodar o projeto
 
