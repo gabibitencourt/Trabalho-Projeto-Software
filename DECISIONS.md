@@ -33,11 +33,21 @@ Este documento registra as contribuições individuais e as decisões de projeto
 
 #### Checkpoint 1 (Semana 2) - Modelo de Domínio
 - **Arquivos sob minha responsabilidade:**
+src/eventos/domain/model.py e tests/unit/test_evento.py — agregado Evento
 - **Intervalo/Hashes de Commits:**
+8f0f937 e 53a858b
 - **O que implementei:**
+implementei classe evento, enum StatusEvento e os testes pertinentes
 - **Justificativa de decisão de projeto:** 
+Unica decisão um pouco diferente que tive que tomar fazer a função alterar_lote 
+localizar o lote pelo identificador, em vez de substituir todos os lotes do 
+evento por um lote novo, assim podendo ter lotes simuntaneos.
 - **Uso de IA Generativa (conforme Seção 2.5):** 
+Usei ia para tirar duvidas de sintaxe, já que nao uso python com frequencia, e 
+apoio conceitual de como usar o DDD da melhor forma.
 - **Simplificações conscientes:** 
+encerrar recebe a quantidade de inscriçoes pendentes como parametro 
+inteiro em vez de consultar o agregado Inscrição diretamente
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
 - **Arquivos sob minha responsabilidade:**
