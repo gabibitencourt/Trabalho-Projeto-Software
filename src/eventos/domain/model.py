@@ -62,6 +62,24 @@ class Evento:
 				"nao e possivel alterar lotes de evento em andamento ou encerrado"
 			)
 
+	def iniciar(self):
+		if self.status is StatusEvento.EM_ANDAMENTO:
+			raise OperacaoInvalidaError("evento ja esta em andamento")
+		if self.status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		self.status = StatusEvento.EM_ANDAMENTO
+
+	def encerrar(self, inscricoes_pendentes):
+		if inscricoes_pendentes < 0:
+			raise ValueError("a quantidade de inscricoes pendentes nao pode ser negativa")
+		if self.status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		if inscricoes_pendentes > 0:
+			raise OperacaoInvalidaError(
+				"nao e possivel encerrar evento com inscricoes pendentes"
+			)
+		self.status = StatusEvento.ENCERRADO
+
 class Inscricao:
     def __init__(self, identificador, participante, lote):
         self.identificador = identificador
