@@ -141,12 +141,12 @@ Nenhuma.
 ### Samuel Carvalho Dias (@SamuelCDiias)
 
 #### Checkpoint 1 (Semana 2) - Modelo de Domínio
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:** 
-- **Uso de IA Generativa (conforme Seção 2.5):** 
-- **Simplificações conscientes:** 
+- **Arquivos sob minha responsabilidade:** src/eventos/domain/model.py e tests/unit/test_inscricao.py.
+- **Intervalo/Hashes de Commits:** 678b3af.
+- **O que implementei:** O agregado Inscricao, associado a participante e lote, com o estado inicial PENDENTE e os estados CONFIRMADA e CANCELADA. Implementei as operações de confirmação, cancelamento e check-in, além de testes unitários para o estado inicial e as transições permitidas e inválidas.
+- **Justificativa de decisão de projeto:** As regras de transição foram mantidas no próprio agregado para preservar as invariantes de negócio: uma inscrição cancelada não pode ser confirmada; o check-in exige inscrição confirmada e não pode ser repetido; e uma inscrição com check-in não pode ser cancelada. As operações inválidas sinalizam erro por meio de OperacaoInvalidaError.
+- **Uso de IA Generativa (conforme Seção 2.5):** Nenhum.
+- **Simplificações conscientes:** Participante e lote são armazenados como referências recebidas pelo construtor, e o check-in é representado por um booleano em memória, sem entidade própria ou persistência nesta etapa.
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
 - **Arquivos sob minha responsabilidade:**
