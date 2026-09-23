@@ -68,8 +68,6 @@ Responsável por: **Lucas Paixao e João Marcello**
 
 ## 6. Divisão inicial de responsabilidades
 
-## 6. Divisão inicial de responsabilidades
-
 | Agregado | Integrante | Entidade / Foco | Semana 2 — Domínio | Semana 3 — Repositório | Semana 4 — Serviço + API | Usuário GitHub |
 |---|---|---|---|---|---|---|
 | **Evento** | Arthur Siqueira | `Evento` | Classe `Evento` + invariantes | `SqlAlchemyEventoRepository` | Casos de uso e rotas de Evento | @devalexandrino |
