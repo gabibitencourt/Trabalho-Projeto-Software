@@ -183,3 +183,23 @@ class Organizador:
         self.nome = nome.strip()
         self.email = email.lower().strip()
         self.role = role
+
+class LoteDeIngresso:
+    def __init__(self, nome, preco, quant_total, quant_vendida=0):
+        if quant_total < 0 or quant_vendida < 0 or preco < 0:
+            raise Exception("Erro: Valor negativo")
+        elif quant_total < quant_vendida:
+            raise Exception("Erro: valor de quant_vendida invalido")
+        
+        self.nome = nome
+        self.preco = preco
+        self.quant_total = quant_total
+        self.quant_vendida = quant_vendida
+
+    def __str__(self):
+            return f"nome: {self.nome}\npreco: {self.preco}\nquantidade total: {self.quant_total}\nquantidade vendida: {self.quant_vendida}"
+
+    def venda(self):
+        if self.quant_vendida == self.quant_total:
+            raise Exception("Erro: Ingressos esgotados")
+        self.quant_vendida += 1

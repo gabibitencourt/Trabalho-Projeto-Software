@@ -1,4 +1,4 @@
-from entitys.LoteDeIngresso import LoteDeIngresso
+from eventos.domain.model import LoteDeIngresso
 import pytest
     
 def teste_caminho_feliz(): # Caminho feliz
