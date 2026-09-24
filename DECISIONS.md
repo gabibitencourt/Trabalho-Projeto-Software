@@ -164,11 +164,11 @@ Nenhuma.
 - **Simplificações conscientes:** Participante e lote são armazenados como referências recebidas pelo construtor, e o check-in é representado por um booleano em memória, sem entidade própria ou persistência nesta etapa.
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:** 
+- **Arquivos sob minha responsabilidade:** src/eventos/adapters/orm.py, src/eventos/adapters/repository.py, src/eventos/domain/model.py e tests/integration/test_sqlalchemy_inscricao_repository.py.
+- **Intervalo/Hashes de Commits:** fe34d5f e 222aade.
+- **O que implementei:** Mapeamento clássico SQLAlchemy/SQLite das entidades Inscricao, Participante e Organizador, incluindo relacionamento entre inscrição e participante. Implementei SqlAlchemyInscricaoRepository com operações de adicionar, obter, listar inscrições por participante, atualizar e remover; também ajustei o FakeInscricaoRepository para armazenar inscrições por identificador. Adicionei testes de integração com SQLite em memória que cobrem persistência, consulta, atualização de status e check-in, remoção e o mapeamento de organizador.
+- **Justificativa de decisão de projeto:** O mapeamento clássico mantém o modelo de domínio separado dos detalhes do banco. A data do check-in é persistida em um atributo interno e exposta como CheckIn apenas quando existente, evitando que um campo nulo do banco seja interpretado como check-in realizado. O repositório recebe uma sessão SQLAlchemy, deixando o controle de transação com a camada de serviço.
+- **Uso de IA Generativa:** Apoio na estruturação inicial do ORM, implementação e validação dos testes; revisão e decisão final do autor.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
 - **Arquivos sob minha responsabilidade:** 
