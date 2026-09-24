@@ -1,5 +1,5 @@
 import abc 
-from eventos.domain.model import Evento, Inscricao
+from eventos.domain.model import Evento, Inscricao, LoteDeIngresso, Pagamento
 
 
 class AbstractEventoRepository(abc.ABC):
@@ -161,3 +161,25 @@ class FakePagamentoRepository(AbstractPagamentoRepository):
         pagamento = self.obter(identificador)
         if pagamento:
             self._pagamentos.remove(pagamento)
+
+class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
+
+    def __init__(self, session):
+        self.session = session
+
+    def adicionar(self, pagamento: Pagamento):
+        self.session.add(pagamento)
+
+    def obter(self, identificador) -> Pagamento | None:
+        return self.session.query(Pagamento).filter_by(identificador=str(identificador)).first()
+
+    def listar_por_inscricao(self, inscricao) -> list[Pagamento]:
+        return self.session.query(Pagamento).filter_by(inscricao=inscricao).all()
+
+    def atualizar(self, pagamento: Pagamento):
+        self.session.merge(pagamento)
+
+    def remover(self, identificador):
+        pagamento = self.obter(identificador)
+        if pagamento:
+            self.session.delete(pagamento)

@@ -3,12 +3,16 @@ from eventos.domain.model import Evento, LoteDeIngresso, StatusEvento
 from sqlalchemy import Column, DateTime, Enum , ForeignKey, Integer, MetaData, String, Table, Float, Date
 
 from eventos.domain.model import (
+    Evento,
     Inscricao,
+    LoteDeIngresso,
     Organizador,
+    Pagamento,
     Participante,
     RoleOrganizador,
+    StatusEvento,
     StatusInscricao,
-    LoteDeIngresso
+    StatusPagamento,
 )
 
 
@@ -64,6 +68,15 @@ inscricoes = Table(
     Column("checkin_data_hora", DateTime, key="_checkin_data_hora", nullable=True),
 )
 
+pagamentos = Table(
+    "pagamentos",
+    metadata,
+    Column("identificador", String(255), primary_key=True),
+    Column("inscricao_id", Integer, ForeignKey("inscricoes.identificador"), nullable=True),
+    Column("valor", Float, nullable=False),
+    Column("status", Enum(StatusPagamento, native_enum=False), nullable=False),
+)
+
 _mappers_started = False
 
 
@@ -90,5 +103,12 @@ def start_mappers():
                 cascade="all, delete-orphan",
                 collection_class=list,
             ),
+        },
+    )
+    mapper_registry.map_imperatively(
+        Pagamento,
+        pagamentos,
+        properties={
+            "inscricao": relationship(Inscricao),
         },
     )
