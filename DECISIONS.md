@@ -133,10 +133,10 @@ Nenhuma.
 - **Simplificações conscientes:** Pagamento ainda usa a Inscricao direto em memoria, sem repositorio/banco.
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
+- **Arquivos sob minha responsabilidade:** src/eventos/adapters/repository.py (AbstractPagamentoRepository e FakePagamentoRepository), tests/unit/test_pagamento_repository.py
+- **Intervalo/Hashes de Commits:** 9502d16, 8447049
+- **O que implementei:** Repositorio abstrato do Pagamento com os metodos adicionar, obter, listar_por_inscricao, atualizar e remover, e a versao fake em memoria pra rodar os testes sem precisar de banco. 5 testes cobrindo esses metodos.
+- **Justificativa de decisão de projeto:** Segui o mesmo modelo que ja tinha sido usado no repositorio de Inscricao (Abstract + Fake, guardando num set()), pra manter o mesmo padrao entre os agregados. Identificador do Pagamento continua inteiro, igual o resto do dominio.
 - **Uso de IA Generativa:** 
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
