@@ -50,11 +50,11 @@ encerrar recebe a quantidade de inscriçoes pendentes como parametro
 inteiro em vez de consultar o agregado Inscrição diretamente
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
-- **Arquivos sob minha responsabilidade:** adapters/orm.py, adapters/repository.py e 
+- **Arquivos sob minha responsabilidade:** adapters/orm.py, adapters/repository.py e
 tests/integration/test_repository_evento.py`
-- **Intervalo/Hashes de Commits:** 
+- **Intervalo/Hashes de Commits:**
 1546813
-- **O que implementei:** 
+- **O que implementei:**
 implementei o mapeamento de evento e lode de ingresso para o sqlchemy
 , repositorios abstratos e fakes e os testes pertinentes
 

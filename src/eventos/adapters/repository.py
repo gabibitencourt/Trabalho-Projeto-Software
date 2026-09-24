@@ -1,4 +1,6 @@
-import abc 
+import abc
+from sqlalchemy.orm import Session
+
 from eventos.domain.model import Evento, Inscricao, LoteDeIngresso, Pagamento
 
 
@@ -44,13 +46,13 @@ class FakeEventoRepository(AbstractEventoRepository):
 
 
 class SqlAlchemyEventoRepository(AbstractEventoRepository):
-    def __init__(self, session):
+    def __init__(self, session: Session):
         self.session = session
 
     def adicionar(self, evento: Evento):
         self.session.add(evento)
 
-    def obter(self, identificador: int) -> Evento:
+    def obter(self, identificador: int) -> Evento | None:
         return self.session.get(Evento, identificador)
 
     def listar(self) -> list[Evento]:
@@ -58,8 +60,7 @@ class SqlAlchemyEventoRepository(AbstractEventoRepository):
 
     def atualizar(self, evento: Evento):
         self.session.merge(evento)
-from eventos.domain.model import Inscricao
-from eventos.domain.model import LoteDeIngresso
+
 
 class AbstractInscricaoRepository(abc.ABC):
     @abc.abstractmethod
@@ -67,15 +68,11 @@ class AbstractInscricaoRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def obter(self, identificador:int) -> Inscricao:
-        raise NotImplementedError
-
-    @abc.abstractmethod 
-    def listar_por_participante(self, participante) ->list[Inscricao]:
+    def obter(self, identificador: int) -> Inscricao | None:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def listar_por_evento(self, evento) ->list[Inscricao]:
+    def listar_por_participante(self, participante) -> list[Inscricao]:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -85,34 +82,58 @@ class AbstractInscricaoRepository(abc.ABC):
     @abc.abstractmethod
     def remover(self, identificador: int):
         raise NotImplementedError
-    
+
+
 class FakeInscricaoRepository(AbstractInscricaoRepository):
     def __init__(self):
-        self._inscricoes = set()
+        self._inscricoes = {}
 
     def adicionar(self, inscricao: Inscricao):
-        self._inscricoes.add(inscricao)
+        self._inscricoes[inscricao.identificador] = inscricao
 
-    def obter(self, identificador:int) -> Inscricao:
-        return next(
-            (i for i in self._inscricoes if i.identificador == identificador),
-            None
-        )
+    def obter(self, identificador: int) -> Inscricao | None:
+        return self._inscricoes.get(identificador)
 
     def listar_por_participante(self, participante) -> list[Inscricao]:
-        return [i for i in self._inscricoes if i.participante == participante]
-
-    def listar_por_evento(self, evento) -> list[Inscricao]:
-        return [i for i in self._inscricoes if i.evento == evento]
+        return [
+            inscricao
+            for inscricao in self._inscricoes.values()
+            if inscricao.participante == participante
+        ]
 
     def atualizar(self, inscricao: Inscricao):
-        self.remover(inscricao.identificador)
-        self.adicionar(inscricao)
+        self._inscricoes[inscricao.identificador] = inscricao
+
+    def remover(self, identificador: int):
+        self._inscricoes.pop(identificador, None)
+
+
+class SqlAlchemyInscricaoRepository(AbstractInscricaoRepository):
+    def __init__(self, session: Session):
+        self.session = session
+
+    def adicionar(self, inscricao: Inscricao):
+        self.session.add(inscricao)
+
+    def obter(self, identificador: int) -> Inscricao | None:
+        return self.session.get(Inscricao, identificador)
+
+    def listar_por_participante(self, participante) -> list[Inscricao]:
+        return (
+            self.session.query(Inscricao)
+            .filter_by(participante=participante)
+            .order_by(Inscricao.identificador)
+            .all()
+        )
+
+    def atualizar(self, inscricao: Inscricao):
+        self.session.add(inscricao)
 
     def remover(self, identificador: int):
         inscricao = self.obter(identificador)
         if inscricao:
-            self._inscricoes.remove(inscricao)
+            self.session.delete(inscricao)
+
 
 class AbstractPagamentoRepository(abc.ABC):
     @abc.abstractmethod
@@ -137,7 +158,6 @@ class AbstractPagamentoRepository(abc.ABC):
 
 
 class FakePagamentoRepository(AbstractPagamentoRepository):
-
     def __init__(self, pagamentos=None):
         self._pagamentos = set(pagamentos) if pagamentos else set()
 
@@ -147,7 +167,7 @@ class FakePagamentoRepository(AbstractPagamentoRepository):
     def obter(self, identificador) -> Pagamento | None:
         return next(
             (p for p in self._pagamentos if str(p.identificador) == str(identificador)),
-            None
+            None,
         )
 
     def listar_por_inscricao(self, inscricao) -> list[Pagamento]:
@@ -162,9 +182,9 @@ class FakePagamentoRepository(AbstractPagamentoRepository):
         if pagamento:
             self._pagamentos.remove(pagamento)
 
-class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
 
-    def __init__(self, session):
+class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
+    def __init__(self, session: Session):
         self.session = session
 
     def adicionar(self, pagamento: Pagamento):
