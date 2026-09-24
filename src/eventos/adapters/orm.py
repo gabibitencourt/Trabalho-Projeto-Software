@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Enum as SqlEnum, ForeignKey, Integer, MetaData, String, Table
+from sqlalchemy import Column, DateTime, Enum as SqlEnum, ForeignKey, Integer, MetaData, String, Table, Double
 from sqlalchemy.orm import registry, relationship
 
 from eventos.domain.model import (
@@ -7,6 +7,7 @@ from eventos.domain.model import (
     Participante,
     RoleOrganizador,
     StatusInscricao,
+    LoteDeIngresso
 )
 
 
@@ -41,6 +42,15 @@ inscricoes = Table(
     Column("checkin_data_hora", DateTime, key="_checkin_data_hora", nullable=True),
 )
 
+lotes_ingresso = Table(
+    "lote_ingresso",
+    metadata,
+    Column("identificador", Integer, primary_key=True),
+    Column("nome", String(255), nullable=False),
+    Column("preco", Double, nullable=False),
+    Column("quant_total", Integer, nullable=False),
+    Column("quant_vendida", Integer, nullable=False)
+)
 
 _mappers_started = False
 
@@ -59,4 +69,5 @@ def start_mappers():
             "participante": relationship(Participante),
         },
     )
+    mapper_registry.map_imperatively(LoteDeIngresso, lotes_ingresso)
     _mappers_started = True
