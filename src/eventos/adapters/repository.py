@@ -1,8 +1,7 @@
 import abc
-
 from sqlalchemy.orm import Session
 
-from eventos.domain.model import Evento, Inscricao
+from eventos.domain.model import Evento, Inscricao, LoteDeIngresso, Pagamento
 
 
 class AbstractEventoRepository(abc.ABC):
@@ -132,5 +131,75 @@ class SqlAlchemyInscricaoRepository(AbstractInscricaoRepository):
 
     def remover(self, identificador: int):
         inscricao = self.obter(identificador)
-        if inscricao is not None:
+        if inscricao:
             self.session.delete(inscricao)
+
+
+class AbstractPagamentoRepository(abc.ABC):
+    @abc.abstractmethod
+    def adicionar(self, pagamento: Pagamento):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def obter(self, identificador) -> Pagamento | None:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def listar_por_inscricao(self, inscricao) -> list[Pagamento]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def atualizar(self, pagamento: Pagamento):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remover(self, identificador):
+        raise NotImplementedError
+
+
+class FakePagamentoRepository(AbstractPagamentoRepository):
+    def __init__(self, pagamentos=None):
+        self._pagamentos = set(pagamentos) if pagamentos else set()
+
+    def adicionar(self, pagamento: Pagamento):
+        self._pagamentos.add(pagamento)
+
+    def obter(self, identificador) -> Pagamento | None:
+        return next(
+            (p for p in self._pagamentos if str(p.identificador) == str(identificador)),
+            None,
+        )
+
+    def listar_por_inscricao(self, inscricao) -> list[Pagamento]:
+        return [p for p in self._pagamentos if p.inscricao == inscricao]
+
+    def atualizar(self, pagamento: Pagamento):
+        self.remover(pagamento.identificador)
+        self.adicionar(pagamento)
+
+    def remover(self, identificador):
+        pagamento = self.obter(identificador)
+        if pagamento:
+            self._pagamentos.remove(pagamento)
+
+
+class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
+    def __init__(self, session: Session):
+        self.session = session
+
+    def adicionar(self, pagamento: Pagamento):
+        self.session.add(pagamento)
+
+    def obter(self, identificador) -> Pagamento | None:
+        return self.session.query(Pagamento).filter_by(identificador=str(identificador)).first()
+
+    def listar_por_inscricao(self, inscricao) -> list[Pagamento]:
+        return self.session.query(Pagamento).filter_by(inscricao=inscricao).all()
+
+    def atualizar(self, pagamento: Pagamento):
+        self.session.merge(pagamento)
+
+    def remover(self, identificador):
+        pagamento = self.obter(identificador)
+        if pagamento:
+            self.session.delete(pagamento)

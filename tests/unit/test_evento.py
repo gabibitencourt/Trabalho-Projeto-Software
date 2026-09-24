@@ -4,14 +4,15 @@ import pytest
 
 from eventos.domain.model import (
     Evento,
+    LoteDeIngresso,
     OperacaoInvalidaError,
     StatusEvento,
 )
 
 
-class LoteFake:
-    def __init__(self, identificador=1):
-        self.identificador = identificador
+class LoteFake(LoteDeIngresso):
+    def __init__(self, identificador=1, *args, **kwargs):
+        super().__init__(identificador, "Lote Teste", 100.0, 100)
 
 
 def criar_evento(status=StatusEvento.PLANEJADO):

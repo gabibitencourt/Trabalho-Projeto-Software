@@ -112,11 +112,12 @@ Nenhuma.
 - **Simplificações conscientes:** Lógica mantida em memória, sem banco de dados.
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:** 
+- **Arquivos sob minha responsabilidade:** `src/eventos/adapters/repository.py`, `src/eventos/adapters/orm.py`, `tests/unit/test_pagamento_repository.py`, `tests/integration/test_repository_pagamento.py` e `tests/conftest.py`, no que tange o agregado Pagamento.
+- **Intervalo/Hashes de Commits:** 84166ff até o atual commit.
+- **O que implementei:** `AbstractPagamentoRepository`, `FakePagamentoRepository`, mapeamento ORM da tabela `pagamentos` via SQLAlchemy e `SqlAlchemyPagamentoRepository` com testes unitários e de integração.
+- **Justificativa de decisão de projeto:** Padrão Repository e Data Mapper imperativo mantêm a entidade `Pagamento` desacoplada da infraestrutura, permitindo testes ultrarrápidos em memória.
+- **Uso de IA Generativa (conforme Seção 2.5):** Auxílio na sintaxe do SQLAlchemy, fixtures do Pytest, depuração de escopo de módulos e comandos Git.
+- **Simplificações conscientes:** Uso do SQLite em memória nos testes de integração para evitar dependência de servidor de banco de dados externo.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
 - **Arquivos sob minha responsabilidade:** 
