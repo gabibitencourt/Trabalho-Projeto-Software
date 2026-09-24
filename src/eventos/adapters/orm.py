@@ -1,9 +1,6 @@
-from sqlalchemy import Column, Date, Enum, Float, ForeignKey, Integer, MetaData, String, Table
 from sqlalchemy.orm import registry, relationship
-
 from eventos.domain.model import Evento, LoteDeIngresso, StatusEvento
-from sqlalchemy import Column, DateTime, Enum as SqlEnum, ForeignKey, Integer, MetaData, String, Table, Double
-from sqlalchemy.orm import registry, relationship
+from sqlalchemy import Column, DateTime, Enum , ForeignKey, Integer, MetaData, String, Table, Float, Date
 
 from eventos.domain.model import (
     Inscricao,
@@ -39,19 +36,6 @@ lotes = Table(
 	Column("quant_vendida", Integer, nullable=False),
 )
 
-def start_mappers():
-	mapper_registry.map_imperatively(LoteDeIngresso, lotes)
-	mapper_registry.map_imperatively(
-		Evento,
-		eventos,
-		properties={
-			"_lotes": relationship(
-				LoteDeIngresso,
-				cascade="all, delete-orphan",
-				collection_class=list,
-			),
-		},
-	)
 participantes = Table(
     "participantes",
     metadata,
@@ -67,7 +51,7 @@ organizadores = Table(
     Column("identificador", Integer, primary_key=True),
     Column("nome", String(255), nullable=False),
     Column("email", String(255), nullable=False),
-    Column("role", SqlEnum(RoleOrganizador, native_enum=False), nullable=False),
+    Column("role", Enum(RoleOrganizador, native_enum=False), nullable=False),
 )
 
 inscricoes = Table(
@@ -76,7 +60,7 @@ inscricoes = Table(
     Column("identificador", Integer, primary_key=True),
     Column("participante_id", ForeignKey("participantes.identificador"), nullable=False),
     Column("lote", String(255), nullable=False),
-    Column("status", SqlEnum(StatusInscricao, native_enum=False), nullable=False),
+    Column("status", Enum(StatusInscricao, native_enum=False), nullable=False),
     Column("checkin_data_hora", DateTime, key="_checkin_data_hora", nullable=True),
 )
 
@@ -84,8 +68,7 @@ _mappers_started = False
 
 
 def start_mappers():
-    global _mappers_started
-    if _mappers_started:
+    if Evento in {m.class_ for m in mapper_registry.mappers}:
         return
 
     mapper_registry.map_imperatively(Participante, participantes)
@@ -97,4 +80,15 @@ def start_mappers():
             "participante": relationship(Participante),
         },
     )
-    _mappers_started = True
+    mapper_registry.map_imperatively(LoteDeIngresso, lotes)
+    mapper_registry.map_imperatively(
+        Evento,
+        eventos,
+        properties={
+            "_lotes": relationship(
+                LoteDeIngresso,
+                cascade="all, delete-orphan",
+                collection_class=list,
+            ),
+        },
+    )

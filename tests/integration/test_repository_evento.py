@@ -65,7 +65,7 @@ def test_atualizar_evento_persiste_mudanca_de_status(repository):
 def test_adicionar_evento_persiste_seus_lotes(repository):
     evento_repository, session = repository
     evento = criar_evento()
-    evento.adicionar_lote(LoteDeIngresso("Inteira", 100, 50))
+    evento.adicionar_lote(LoteDeIngresso(1, "Inteira", 100, 50))
 
     evento_repository.adicionar(evento)
     session.commit()
