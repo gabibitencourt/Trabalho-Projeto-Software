@@ -86,7 +86,17 @@ class Inscricao:
         self.participante = participante
         self.lote = lote
         self.status = StatusInscricao.PENDENTE
-        self.checkin = None
+        self._checkin_data_hora = None
+
+    @property
+    def checkin(self) -> CheckIn | None:
+        if self._checkin_data_hora is None:
+            return None
+        return CheckIn(data_hora=self._checkin_data_hora)
+
+    @checkin.setter
+    def checkin(self, checkin: CheckIn | None):
+        self._checkin_data_hora = None if checkin is None else checkin.data_hora
 
     @property
     def checkin_realizado(self) -> bool:
@@ -98,7 +108,7 @@ class Inscricao:
         self.status = StatusInscricao.CONFIRMADA
 
     def cancelar(self):
-        if self.checkin is not None:
+        if self.checkin_realizado:
             raise OperacaoInvalidaError("nao e possivel cancelar inscricao com check-in")
         if self.status is StatusInscricao.CANCELADA:
             raise OperacaoInvalidaError("inscricao ja esta cancelada")
@@ -107,7 +117,7 @@ class Inscricao:
     def realizar_checkin(self, data_hora=None) -> CheckIn:
         if self.status is not StatusInscricao.CONFIRMADA:
             raise OperacaoInvalidaError("check-in exige inscricao confirmada")
-        if self.checkin is not None:
+        if self.checkin_realizado:
             raise OperacaoInvalidaError("check-in ja realizado")
             
         self.checkin = CheckIn(data_hora=data_hora or datetime.now())
