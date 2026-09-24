@@ -195,12 +195,13 @@ class Organizador:
         self.role = role
 
 class LoteDeIngresso:
-    def __init__(self, nome, preco, quant_total, quant_vendida=0):
+    def __init__(self, identificador, nome, preco, quant_total, quant_vendida=0):
         if quant_total < 0 or quant_vendida < 0 or preco < 0:
             raise Exception("Erro: Valor negativo")
         elif quant_total < quant_vendida:
             raise Exception("Erro: valor de quant_vendida invalido")
-        
+
+        self.identificador = identificador
         self.nome = nome
         self.preco = preco
         self.quant_total = quant_total

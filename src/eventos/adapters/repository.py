@@ -2,7 +2,65 @@ import abc
 
 from sqlalchemy.orm import Session
 
-from eventos.domain.model import Inscricao
+from eventos.domain.model import Evento, Inscricao
+
+
+class AbstractEventoRepository(abc.ABC):
+    @abc.abstractmethod
+    def adicionar(self, evento: Evento):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def obter(self, identificador: int) -> Evento:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def listar(self) -> list[Evento]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def atualizar(self, evento: Evento):
+        raise NotImplementedError
+
+
+class FakeEventoRepository(AbstractEventoRepository):
+    def __init__(self):
+        self._eventos = set()
+
+    def adicionar(self, evento: Evento):
+        self._eventos.add(evento)
+
+    def obter(self, identificador: int) -> Evento:
+        return next(
+            (evento for evento in self._eventos if evento.identificador == identificador),
+            None,
+        )
+
+    def listar(self) -> list[Evento]:
+        return list(self._eventos)
+
+    def atualizar(self, evento: Evento):
+        evento_anterior = self.obter(evento.identificador)
+        if evento_anterior is not None:
+            self._eventos.remove(evento_anterior)
+        self.adicionar(evento)
+
+
+class SqlAlchemyEventoRepository(AbstractEventoRepository):
+    def __init__(self, session: Session):
+        self.session = session
+
+    def adicionar(self, evento: Evento):
+        self.session.add(evento)
+
+    def obter(self, identificador: int) -> Evento | None:
+        return self.session.get(Evento, identificador)
+
+    def listar(self) -> list[Evento]:
+        return list(self.session.query(Evento).all())
+
+    def atualizar(self, evento: Evento):
+        self.session.merge(evento)
 
 
 class AbstractInscricaoRepository(abc.ABC):
