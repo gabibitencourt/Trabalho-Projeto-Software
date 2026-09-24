@@ -50,11 +50,16 @@ encerrar recebe a quantidade de inscriçoes pendentes como parametro
 inteiro em vez de consultar o agregado Inscrição diretamente
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:** 
+- **Arquivos sob minha responsabilidade:** adapters/orm.py, adapters/repository.py e 
+tests/integration/test_repository_evento.py`
+- **Intervalo/Hashes de Commits:** 
+1546813
+- **O que implementei:** 
+implementei o mapeamento de evento e lode de ingresso para o sqlchemy
+, repositorios abstratos e fakes e os testes pertinentes
+
+- **Justificativa de decisão de projeto:** optei pelo mapeamento classico para manter o dominio independente do SQLAlchemy. O relacionamento entre eventos e lotes utiliza composiçao, com atualização e remoção dos lotes acompanhando o ciclo de vida do evento.
+- **Uso de IA Generativa:** Utilizei IA como apoio para esclarecer a estrutura dos repositórios a organização dos testes de integração.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
 - **Arquivos sob minha responsabilidade:** 
