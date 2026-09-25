@@ -141,7 +141,7 @@ class AbstractPagamentoRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def obter(self, identificador) -> Pagamento | None:
+    def obter(self, identificador: int) -> Pagamento:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -158,16 +158,16 @@ class AbstractPagamentoRepository(abc.ABC):
 
 
 class FakePagamentoRepository(AbstractPagamentoRepository):
-    def __init__(self, pagamentos=None):
-        self._pagamentos = set(pagamentos) if pagamentos else set()
+    def __init__(self):
+        self._pagamentos = set()
 
     def adicionar(self, pagamento: Pagamento):
         self._pagamentos.add(pagamento)
 
-    def obter(self, identificador) -> Pagamento | None:
+    def obter(self, identificador: int) -> Pagamento:
         return next(
-            (p for p in self._pagamentos if str(p.identificador) == str(identificador)),
-            None,
+            (p for p in self._pagamentos if p.identificador == identificador),
+            None
         )
 
     def listar_por_inscricao(self, inscricao) -> list[Pagamento]:
