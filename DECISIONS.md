@@ -7,19 +7,19 @@ Este documento registra as contribuições individuais e as decisões de projeto
 
 #### Checkpoint 1 (Semana 2) - Modelo de Domínio
 - **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py`, `tests/unit/test_participante.py`, `tests/unit/test_organizador.py`
-- **Intervalo/Hashes de Commits:** 
+- **Intervalo/Hashes de Commits:** 08c54ee2e8cddfa11a1421aba6edeeb5633fc095, ba86e35544e67acd0ad374ebaa84b0e8e9c3285b, 46348bb63e356ac838a0068f6e410dcd0c01ac5b, 7dbabf2260f8374ef3cd9a344d9f5bed257e5df5, 160dfc853b4e03983f71092b8e1099fe6fb1029a, ae5a47f0924d7ebac6c49e5d06e7d8171efc637a, 30b8bce8c3a5b79ac70fb94f1a4cfc9712f3605f, b014478641d042036fc37283306bd8c60b8f58f4, b450185034362bfbbb4c0ea7555220337881f041, 9a831ab4a1bd87ea17a829330f328f620af7636b
 - **O que implementei:** Desenvolvimento via TDD dos modelos de domínio para as entidades `Participante` e `Organizador`. Implementação de regras de validação cadastral (formato de e-mail e documento CPF) e atribuição de papéis de acesso do organizador.
 - **Justificativa de decisão de projeto:** Adotei a autovalidação no construtor das entidades (`self-validation`) para garantir que nenhum objeto `Participante` ou `Organizador` seja instanciado em estado inválido dentro do domínio.
 - **Uso de IA Generativa (conforme Seção 2.5):** Dúvidas conceituais sobre estruturação de testes TDD com pytest.
 - **Simplificações conscientes:** Limpeza de caracteres especiais de CPF e validação de e-mail via expressões regulares nativas do Python.
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:** 
-
+- **Arquivos sob minha responsabilidade:** `src/eventos/adapters/respository.py` (FakeInscricaoRepository e AbstractInscricaoRepository), `tests/integration/test_fake_inscricao_repository.py`
+- **Intervalo/Hashes de Commits:** 69ad4912fcd3d1a4d0d0c0608b60a3a8f69417c8, 41f65ab127d839b9ba8d8be5d74cadb57f834e2, 892035065274074a933bdd22e6929bc054aee71b
+- **O que implementei:** Criei a interface base `AbstractInscricaoRepository` definindo os contratos do repositório e implementei a classe `FakeInscricaoRepository` para simulação em memória, contemplando operações de adição, busca, listagem, atualização e remoção. Também desenvolvi a suíte completa de testes de integração para validar esse comportamento.
+- **Justificativa de decisão de projeto:** Optei por utilizar um `set` nativo do Python na classe `FakeInscricaoRepository` em vez de uma lista. Essa decisão simula a unicidade dos registros em memória, evitando duplicidades acidentais (como salvar a mesma instância duas vezes) e garantindo um comportamento de restrição mais próximo ao de um banco de dados relacional com chaves primárias.
+- **Uso de IA Generativa:**
+ 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
 - **Arquivos sob minha responsabilidade:** 
 - **Intervalo/Hashes de Commits:** 
