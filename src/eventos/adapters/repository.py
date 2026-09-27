@@ -153,7 +153,7 @@ class AbstractPagamentoRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def remover(self, identificador):
+    def remover(self, identificador: int):
         raise NotImplementedError
 
 
@@ -177,7 +177,7 @@ class FakePagamentoRepository(AbstractPagamentoRepository):
         self.remover(pagamento.identificador)
         self.adicionar(pagamento)
 
-    def remover(self, identificador):
+    def remover(self, identificador: int):
         pagamento = self.obter(identificador)
         if pagamento:
             self._pagamentos.remove(pagamento)
@@ -190,8 +190,8 @@ class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
     def adicionar(self, pagamento: Pagamento):
         self.session.add(pagamento)
 
-    def obter(self, identificador) -> Pagamento | None:
-        return self.session.query(Pagamento).filter_by(identificador=str(identificador)).first()
+    def obter(self, identificador: int) -> Pagamento | None:
+        return self.session.get(Pagamento, identificador)
 
     def listar_por_inscricao(self, inscricao) -> list[Pagamento]:
         return self.session.query(Pagamento).filter_by(inscricao=inscricao).all()
@@ -199,7 +199,7 @@ class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
     def atualizar(self, pagamento: Pagamento):
         self.session.merge(pagamento)
 
-    def remover(self, identificador):
+    def remover(self, identificador: int):
         pagamento = self.obter(identificador)
         if pagamento:
             self.session.delete(pagamento)

@@ -71,7 +71,7 @@ inscricoes = Table(
 pagamentos = Table(
     "pagamentos",
     metadata,
-    Column("identificador", String(255), primary_key=True),
+    Column("identificador", Integer, primary_key=True),
     Column("inscricao_id", Integer, ForeignKey("inscricoes.identificador"), nullable=True),
     Column("valor", Float, nullable=False),
     Column("status", Enum(StatusPagamento, native_enum=False), nullable=False),
