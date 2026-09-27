@@ -146,11 +146,13 @@ Nenhuma.
 - **Uso de IA Generativa:** 
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
-- **Arquivos sob minha responsabilidade:** 
-- **Intervalo/Hashes de Commits:** 
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:**
+ Entrega da Fase 1 (Semana 4) - Serviço e API
+- **Arquivos sob minha responsabilidade:** src/eventos/service_layer/services.py (processar_pagamento e confirmar_inscricao_apos_pagamento), src/eventos/entrypoints/flask_app.py, tests/unit/test_service_pagamento.py, tests/e2e/test_flask_pagamento.py. Também ajustei src/eventos/adapters/orm.py e src/eventos/adapters/repository.py (o mapeamento de Pagamento feito pelo Joao usava identificador como string, incompativel com o resto do dominio, que usa inteiro).
+- **Intervalo/Hashes de Commits:**
+- **O que implementei:** Caso de uso processar_pagamento (cria o pagamento vinculado a uma inscricao existente, impede duplicar pagamento aprovado pra mesma inscricao, aplica aprovacao/recusa) e confirmar_inscricao_apos_pagamento (so confirma a inscricao se o pagamento estiver aprovado - cruza os agregados Pagamento -> Inscricao). Endpoint Flask com as duas rotas correspondentes (POST /pagamentos e POST /pagamentos/<id>/confirmar-inscricao).
+- **Justificativa de decisão de projeto:** O resultado da aprovacao/recusa e recebido como parametro (aprovado: bool) simulando o retorno de um gateway externo, em vez de integrar com um servico real. A verificacao de pagamento aprovado duplicado fica no service layer (nao na entidade), porque depende de consultar outros pagamentos da mesma inscricao via repositorio.
+- **Uso de IA Generativa (conforme Seção 2.5):**
+- **Simplificações conscientes:** Sessão do Flask criada e fechada por requisição, sem pool de conexões nem autenticação
 
 ---
 
