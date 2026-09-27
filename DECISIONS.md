@@ -86,11 +86,11 @@ Utilizada apenas para consulta.
 Nenhuma.
 
 #### Checkpoint 2 (Semana 3) - Repositórios e Persistência
-- **Arquivos sob minha responsabilidade:**
-- **Intervalo/Hashes de Commits:**
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:** 
+- **Arquivos sob minha responsabilidade:** tests/integration/test_fake_repository.py, src/adapters/repository.py e src/adapters/orm.py
+- **Intervalo/Hashes de Commits:** 1de3be183a7a83fe9eab6e45d844660150dfc4cc e 9bbd30430581b8d143254910977bc305e39272f0
+- **O que implementei:** teste do fake_repository.
+- **Justificativa de decisão de projeto:** optei pelo mapeamento classico para manter o dominio independente do SQLAlchemy. O relacionamento entre eventos e lotes utiliza composiçao, com atualização e remoção dos lotes acompanhando o ciclo de vida do evento.
+- **Uso de IA Generativa:** Utilizada para consulta.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
 - **Arquivos sob minha responsabilidade:** 
