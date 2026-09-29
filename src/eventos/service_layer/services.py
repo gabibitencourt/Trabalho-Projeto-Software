@@ -1,6 +1,6 @@
 from datetime import date
 
-from eventos.domain.model import Evento, Inscricao, StatusEvento, StatusInscricao
+from eventos.domain.model import Evento, Inscricao, Pagamento, StatusEvento, StatusInscricao
 
 
 class InscricaoNaoEncontradaError(Exception):
@@ -67,3 +67,40 @@ def encerrar_evento(
     )
     evento.encerrar(inscricoes_pendentes=inscricoes_pendentes)
     repositorio_evento.atualizar(evento)
+
+class PagamentoNaoEncontradoError(Exception):
+    pass
+
+
+def registrar_pagamento(
+    identificador: int,
+    inscricao_id: int,
+    valor: float,
+    repositorio_pagamento,
+    repositorio_inscricao,
+):
+    inscricao = repositorio_inscricao.obter(inscricao_id)
+    if inscricao is None:
+        raise InscricaoNaoEncontradaError("inscricao nao encontrada")
+
+    pagamento = Pagamento(
+        identificador=identificador,
+        inscricao=inscricao,
+        valor=valor,
+    )
+    repositorio_pagamento.adicionar(pagamento)
+    return pagamento
+
+
+def obter_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = repositorio_pagamento.obter(identificador)
+    if pagamento is None:
+        raise PagamentoNaoEncontradoError("pagamento nao encontrado")
+    return pagamento
+
+
+def aprovar_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = obter_pagamento(identificador, repositorio_pagamento)
+    pagamento.aprovar()
+    repositorio_pagamento.atualizar(pagamento)
+    return pagamento
