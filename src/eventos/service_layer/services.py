@@ -145,6 +145,12 @@ def confirmar_inscricao_apos_pagamento(
     repositorio_inscricao.atualizar(pagamento.inscricao)
     return pagamento.inscricao
 
+def realizar_checkin(identificador: int, repositorio_inscricao):
+    inscricao = obter_inscricao(identificador, repositorio_inscricao)
+    inscricao.realizar_checkin()
+    repositorio_inscricao.atualizar(inscricao)
+    return inscricao
+
 def criar_lote_ingresso(repositorio_evento, evento_id, identificador, nome, preco, quant_total, quant_vendida=0):    
     if repositorio_evento.obter(evento_id) is None:
         raise Exception("Evento nao encontrado.")

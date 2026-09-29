@@ -21,11 +21,11 @@ Este documento registra as contribuições individuais e as decisões de projeto
 - **Uso de IA Generativa:**
  
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
-- **Arquivos sob minha responsabilidade:** 
-- **Intervalo/Hashes de Commits:** 
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:**
+- **Arquivos sob minha responsabilidade:** `src/eventos/service_layer/services.py`, `src/eventos/entrypoints/flask_app.py`, `tests/e2e/test_inscricoes_api.py`
+- **Intervalo/Hashes de Commits:** ea860a093ff012b65a57202890ed8c34e8fc5c69, 59b34fe974a8cc4816ce6c9a4114d82e56757a87, f4f50c06ac03085688fa873d3ee4c7dda43d87dc
+- **O que implementei:** Função de orquestração realizar_checkin na camada de serviço, endpoint Flask POST /inscricoes/<identificador>/checkin e os respectivos testes E2E (caminho feliz e tratamento de erro para inscrição pendente).
+- **Justificativa de decisão de projeto:** Foquei na entrega completa (Serviço + API + Testes) do Caso de Uso 7, pois as invariantes dessa entidade já estavam consolidadas.
+- **Uso de IA Generativa:** Usei a IA de apoio para esclarecer a estrutura dos repositórios e para entender melhor a camada de serviço.
 
 ---
 

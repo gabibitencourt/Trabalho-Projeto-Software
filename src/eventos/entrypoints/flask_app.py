@@ -164,6 +164,12 @@ def create_app(session=None):
         session.commit()
         return jsonify(_serializar_inscricao(inscricao))    
 
+    @app.post("/inscricoes/<int:identificador>/checkin")
+    def realizar_checkin(identificador):
+        inscricao = services.realizar_checkin(identificador, repository)
+        session.commit()
+        return jsonify(_serializar_inscricao(inscricao))
+
     @app.post("/lotes")
     def registrar_lote():
         dados = request.get_json(silent=True) or {}
