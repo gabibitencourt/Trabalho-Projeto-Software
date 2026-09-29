@@ -143,3 +143,9 @@ def confirmar_inscricao_apos_pagamento(
     pagamento.inscricao.confirmar()
     repositorio_inscricao.atualizar(pagamento.inscricao)
     return pagamento.inscricao
+
+def realizar_checkin(identificador: int, repositorio_inscricao):
+    inscricao = obter_inscricao(identificador, repositorio_inscricao)
+    inscricao.realizar_checkin()
+    repositorio_inscricao.atualizar(inscricao)
+    return inscricao
