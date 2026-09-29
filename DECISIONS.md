@@ -96,11 +96,11 @@ Nenhuma.
 - **Uso de IA Generativa:** Utilizada para consulta.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
-- **Arquivos sob minha responsabilidade:** 
-- **Intervalo/Hashes de Commits:** 
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:**
+- **Arquivos sob minha responsabilidade:** `src/eventos/service_layer/services.py` e `tests/unit/test_services_pagamento.py`
+- **Intervalo/Hashes de Commits:** Branch `feature/pagamento-services-api`
+- **O que implementei:** Implementei a exceção customizada `PagamentoNaoEncontradoError` e criei as funções de orquestração na camada de serviço (`registrar_pagamento`, `obter_pagamento` e `aprovar_pagamento`). Também construí a suíte de testes unitários para validar todo o fluxo de criação, aprovação e tratamento de erros utilizando repositórios dublês (`FakeInscricaoRepository` e `FakePagamentoRepository`).
+- **Justificativa de decisão de projeto:** Segui o padrão de Service Layer para isolar os casos de uso das regras da API. Dessa forma, a lógica de orquestração do pagamento (validar a inscrição e aplicar a transação) não se acopla ao Flask, permitindo a execução rápida e confiável dos testes unitários antes da entrega das rotas.
+- **Uso de IA Generativa:** A IA foi utilizada como assistente de codificação para agilizar a criação dos testes unitários em Pytest, formatar a estrutura das funções de serviço com injeção de dependência e auxiliar na resolução de problemas de configuração e execução do ambiente virtual no terminal PowerShell.
 
 ---
 
