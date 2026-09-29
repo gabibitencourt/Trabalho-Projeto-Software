@@ -172,8 +172,8 @@ Nenhuma.
 - **Uso de IA Generativa:** Apoio na estruturação inicial do ORM, implementação e validação dos testes; revisão e decisão final do autor.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
-- **Arquivos sob minha responsabilidade:** 
-- **Intervalo/Hashes de Commits:** 
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
+- **Arquivos sob minha responsabilidade:** src/eventos/service_layer/services.py, src/eventos/entrypoints/flask_app.py e tests/e2e/test_inscricoes_api.py.
+- **Intervalo/Hashes de Commits:** Alterações locais da Entrega da Fase 1.
+- **O que implementei:** Casos de uso de criar, consultar, confirmar e cancelar inscrição. Criei endpoints Flask correspondentes (POST /inscricoes, GET /inscricoes/<id>, POST /inscricoes/<id>/confirmar e POST /inscricoes/<id>/cancelar) e testes e2e que validam a criação, consulta, confirmação, cancelamento e o retorno 404 para inscrição inexistente.
+- **Justificativa de decisão de projeto:** Os fluxos foram concentrados na camada de serviço, que coordena o agregado e o repositório; o endpoint apenas interpreta a requisição, confirma a transação e serializa a resposta. A aplicação recebe uma sessão opcional para permitir testes e2e com SQLite em memória.
 - **Uso de IA Generativa:**
