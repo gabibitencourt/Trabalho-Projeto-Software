@@ -2,66 +2,155 @@ from flask import Flask, jsonify, request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from eventos.adapters import orm
+from eventos.adapters.orm import metadata, start_mappers
 from eventos.adapters.repository import (
     SqlAlchemyInscricaoRepository,
     SqlAlchemyPagamentoRepository,
 )
-from eventos.domain.model import OperacaoInvalidaError
+from eventos.domain.model import OperacaoInvalidaError, Participante
 from eventos.service_layer import services
 
 
-def create_app(db_url="sqlite:///:memory:"):
-    engine = create_engine(db_url)
-    orm.start_mappers()
-    orm.metadata.create_all(engine)
-    session_factory = sessionmaker(bind=engine)
+def _serializar_inscricao(inscricao):
+    return {
+        "identificador": inscricao.identificador,
+        "participante": {
+            "identificador": inscricao.participante.identificador,
+            "nome": inscricao.participante.nome,
+            "email": inscricao.participante.email,
+            "documento": inscricao.participante.documento,
+        },
+        "lote": inscricao.lote,
+        "status": inscricao.status.value,
+        "checkin": (
+            inscricao.checkin.data_hora.isoformat()
+            if inscricao.checkin is not None
+            else None
+        ),
+    }
 
+
+def _serializar_pagamento(pagamento):
+    return {
+        "identificador": pagamento.identificador,
+        "inscricao_id": pagamento.inscricao.identificador,
+        "valor": pagamento.valor,
+        "status": pagamento.status.value,
+    }
+
+
+def create_app(session=None):
+    start_mappers()
+    if session is None:
+        engine = create_engine("sqlite:///:memory:")
+        metadata.create_all(engine)
+        session = sessionmaker(bind=engine)()
+
+    repository = SqlAlchemyInscricaoRepository(session)
+    repositorio_pagamento = SqlAlchemyPagamentoRepository(session)
     app = Flask(__name__)
-    app.session_factory = session_factory
+
+    @app.errorhandler(services.InscricaoNaoEncontradaError)
+    def inscricao_nao_encontrada(error):
+        return jsonify({"erro": str(error)}), 404
+
+    @app.errorhandler(services.PagamentoNaoEncontradoError)
+    def pagamento_nao_encontrado(error):
+        return jsonify({"erro": str(error)}), 404
+
+    @app.errorhandler(OperacaoInvalidaError)
+    def operacao_invalida(error):
+        return jsonify({"erro": str(error)}), 400
+
+    @app.errorhandler(ValueError)
+    def requisicao_invalida(error):
+        return jsonify({"erro": str(error)}), 400
+
+    @app.post("/inscricoes")
+    def criar_inscricao():
+        dados = request.get_json(silent=True) or {}
+        try:
+            participante = Participante(**dados["participante"])
+            inscricao = services.criar_inscricao(
+                identificador=dados["identificador"],
+                participante=participante,
+                lote=dados["lote"],
+                repositorio=repository,
+            )
+        except KeyError as error:
+            raise ValueError(f"campo obrigatorio: {error.args[0]}") from error
+
+        session.commit()
+        return jsonify(_serializar_inscricao(inscricao)), 201
+
+    @app.get("/inscricoes/<int:identificador>")
+    def obter_inscricao(identificador):
+        inscricao = services.obter_inscricao(identificador, repository)
+        return jsonify(_serializar_inscricao(inscricao))
+
+    @app.post("/inscricoes/<int:identificador>/confirmar")
+    def confirmar_inscricao(identificador):
+        inscricao = services.confirmar_inscricao(identificador, repository)
+        session.commit()
+        return jsonify(_serializar_inscricao(inscricao))
+
+    @app.post("/inscricoes/<int:identificador>/cancelar")
+    def cancelar_inscricao(identificador):
+        inscricao = services.cancelar_inscricao(identificador, repository)
+        session.commit()
+        return jsonify(_serializar_inscricao(inscricao))
 
     @app.post("/pagamentos")
-    def processar_pagamento():
-        dados = request.get_json()
-        session = session_factory()
+    def registrar_pagamento():
+        dados = request.get_json(silent=True) or {}
         try:
-            pagamento = services.processar_pagamento(
+            pagamento = services.registrar_pagamento(
                 identificador=dados["identificador"],
                 inscricao_id=dados["inscricao_id"],
                 valor=dados["valor"],
-                aprovado=dados["aprovado"],
-                repositorio_pagamentos=SqlAlchemyPagamentoRepository(session),
-                repositorio_inscricoes=SqlAlchemyInscricaoRepository(session),
+                repositorio_pagamento=repositorio_pagamento,
+                repositorio_inscricao=repository,
             )
-            session.commit()
-            resposta = {
-                "identificador": pagamento.identificador,
-                "status": pagamento.status.value,
-            }
-        except OperacaoInvalidaError as erro:
-            session.rollback()
-            return jsonify({"erro": str(erro)}), 400
-        finally:
-            session.close()
+        except KeyError as error:
+            raise ValueError(f"campo obrigatorio: {error.args[0]}") from error
 
-        return jsonify(resposta), 201
+        session.commit()
+        return jsonify(_serializar_pagamento(pagamento)), 201
 
-    @app.post("/pagamentos/<int:pagamento_id>/confirmar-inscricao")
-    def confirmar_inscricao(pagamento_id):
-        session = session_factory()
-        try:
-            services.confirmar_inscricao_apos_pagamento(
-                pagamento_id=pagamento_id,
-                repositorio_pagamentos=SqlAlchemyPagamentoRepository(session),
-                repositorio_inscricoes=SqlAlchemyInscricaoRepository(session),
-            )
-            session.commit()
-        except OperacaoInvalidaError as erro:
-            session.rollback()
-            return jsonify({"erro": str(erro)}), 400
-        finally:
-            session.close()
+    @app.get("/pagamentos/<int:identificador>")
+    def obter_pagamento(identificador):
+        pagamento = services.obter_pagamento(identificador, repositorio_pagamento)
+        return jsonify(_serializar_pagamento(pagamento))
 
-        return jsonify({"mensagem": "inscricao confirmada"}), 200
+    @app.post("/pagamentos/<int:identificador>/aprovar")
+    def aprovar_pagamento(identificador):
+        pagamento = services.aprovar_pagamento(identificador, repositorio_pagamento)
+        session.commit()
+        return jsonify(_serializar_pagamento(pagamento))
+
+    @app.post("/pagamentos/<int:identificador>/recusar")
+    def recusar_pagamento(identificador):
+        pagamento = services.recusar_pagamento(identificador, repositorio_pagamento)
+        session.commit()
+        return jsonify(_serializar_pagamento(pagamento))
+
+    @app.post("/pagamentos/<int:identificador>/estornar")
+    def estornar_pagamento(identificador):
+        pagamento = services.estornar_pagamento(identificador, repositorio_pagamento)
+        session.commit()
+        return jsonify(_serializar_pagamento(pagamento))
+
+    @app.post("/pagamentos/<int:identificador>/confirmar-inscricao")
+    def confirmar_inscricao_apos_pagamento(identificador):
+        inscricao = services.confirmar_inscricao_apos_pagamento(
+            identificador=identificador,
+            repositorio_pagamento=repositorio_pagamento,
+            repositorio_inscricao=repository,
+        )
+        session.commit()
+        return jsonify(_serializar_inscricao(inscricao))
 
     return app
+
+
+app = create_app()

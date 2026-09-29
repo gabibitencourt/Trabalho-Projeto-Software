@@ -1,45 +1,145 @@
-from eventos.domain.model import OperacaoInvalidaError, Pagamento, StatusPagamento
+from datetime import date
+
+from eventos.domain.model import (
+    Evento,
+    Inscricao,
+    OperacaoInvalidaError,
+    Pagamento,
+    StatusEvento,
+    StatusInscricao,
+    StatusPagamento,
+)
 
 
-def processar_pagamento(
-    identificador,
-    inscricao_id,
-    valor,
-    aprovado,
-    repositorio_pagamentos,
-    repositorio_inscricoes,
-) -> Pagamento:
-    inscricao = repositorio_inscricoes.obter(inscricao_id)
+class InscricaoNaoEncontradaError(Exception):
+    pass
+
+
+def criar_inscricao(identificador, participante, lote, repositorio):
+    inscricao = Inscricao(
+        identificador=identificador,
+        participante=participante,
+        lote=lote,
+    )
+    repositorio.adicionar(inscricao)
+    return inscricao
+
+
+def obter_inscricao(identificador, repositorio):
+    inscricao = repositorio.obter(identificador)
     if inscricao is None:
-        raise OperacaoInvalidaError("inscricao nao encontrada")
+        raise InscricaoNaoEncontradaError("inscricao nao encontrada")
+    return inscricao
 
-    pagamentos_da_inscricao = repositorio_pagamentos.listar_por_inscricao(inscricao)
-    if any(p.status is StatusPagamento.APROVADO for p in pagamentos_da_inscricao):
-        raise OperacaoInvalidaError("inscricao ja possui pagamento aprovado")
 
-    pagamento = Pagamento(identificador, inscricao, valor)
-    if aprovado:
-        pagamento.aprovar()
-    else:
-        pagamento.recusar()
+def confirmar_inscricao(identificador, repositorio):
+    inscricao = obter_inscricao(identificador, repositorio)
+    inscricao.confirmar()
+    repositorio.atualizar(inscricao)
+    return inscricao
 
-    repositorio_pagamentos.adicionar(pagamento)
+
+def cancelar_inscricao(identificador, repositorio):
+    inscricao = obter_inscricao(identificador, repositorio)
+    inscricao.cancelar()
+    repositorio.atualizar(inscricao)
+    return inscricao
+
+
+def criar_evento(repositorio, nome: str, data: str, local: str) -> int:
+    identificadores = [evento.identificador for evento in repositorio.listar()]
+    identificador = max(identificadores, default=0) + 1
+    evento = Evento(
+        identificador=identificador,
+        nome=nome,
+        data=date.fromisoformat(data),
+        local=local,
+        status=StatusEvento.PLANEJADO,
+    )
+    repositorio.adicionar(evento)
+    return identificador
+
+
+def encerrar_evento(
+	repositorio_evento,
+	repositorio_inscricao,
+	identificador_evento: int,
+) -> None:
+    evento = repositorio_evento.obter(identificador_evento)
+    if evento is None:
+        raise LookupError(f"evento {identificador_evento} nao encontrado")
+
+    inscricoes = repositorio_inscricao.listar_por_evento(identificador_evento)
+    inscricoes_pendentes = sum(
+        inscricao.status is StatusInscricao.PENDENTE for inscricao in inscricoes
+    )
+    evento.encerrar(inscricoes_pendentes=inscricoes_pendentes)
+    repositorio_evento.atualizar(evento)
+
+
+class PagamentoNaoEncontradoError(Exception):
+    pass
+
+
+def registrar_pagamento(
+    identificador: int,
+    inscricao_id: int,
+    valor: float,
+    repositorio_pagamento,
+    repositorio_inscricao,
+):
+    inscricao = repositorio_inscricao.obter(inscricao_id)
+    if inscricao is None:
+        raise InscricaoNaoEncontradaError("inscricao nao encontrada")
+
+    pagamento = Pagamento(
+        identificador=identificador,
+        inscricao=inscricao,
+        valor=valor,
+    )
+    repositorio_pagamento.adicionar(pagamento)
+    return pagamento
+
+
+def obter_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = repositorio_pagamento.obter(identificador)
+    if pagamento is None:
+        raise PagamentoNaoEncontradoError("pagamento nao encontrado")
+    return pagamento
+
+
+def aprovar_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = obter_pagamento(identificador, repositorio_pagamento)
+    pagamento.aprovar()
+    repositorio_pagamento.atualizar(pagamento)
+    return pagamento
+
+
+def recusar_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = obter_pagamento(identificador, repositorio_pagamento)
+    pagamento.recusar()
+    repositorio_pagamento.atualizar(pagamento)
+    return pagamento
+
+
+def estornar_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = obter_pagamento(identificador, repositorio_pagamento)
+    pagamento.estornar()
+    repositorio_pagamento.atualizar(pagamento)
     return pagamento
 
 
 def confirmar_inscricao_apos_pagamento(
-    pagamento_id,
-    repositorio_pagamentos,
-    repositorio_inscricoes,
+    identificador: int,
+    repositorio_pagamento,
+    repositorio_inscricao,
 ):
-    pagamento = repositorio_pagamentos.obter(pagamento_id)
-    if pagamento is None:
-        raise OperacaoInvalidaError("pagamento nao encontrado")
-
+    pagamento = obter_pagamento(identificador, repositorio_pagamento)
     if pagamento.status is not StatusPagamento.APROVADO:
         raise OperacaoInvalidaError(
             "so e possivel confirmar inscricao com pagamento aprovado"
         )
 
     pagamento.inscricao.confirmar()
-    repositorio_inscricoes.atualizar(pagamento.inscricao)
+    repositorio_inscricao.atualizar(pagamento.inscricao)
+    return pagamento.inscricao

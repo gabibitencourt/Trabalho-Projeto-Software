@@ -63,11 +63,14 @@ implementei o mapeamento de evento e lode de ingresso para o sqlchemy
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
 - **Arquivos sob minha responsabilidade:** 
+tests/unit/test_service_evento e src/evento/service_layer/services.py
 - **Intervalo/Hashes de Commits:** 
+8653083e
 - **O que implementei:**
-- **Justificativa de decisão de projeto:**
+camada de serviço se evento e os testes pertinentes a camada de serviço.
+- **Justificativa de decisão de projeto:** Para criar eventos sem geração de IDs pelo banco, o serviço escolhe o maior identificador existente mais um. Para encerrar, consulta inscrições através do contrato listar_por_evento(identificador_evento), e conta os status pendentes. a implementação atual do repositório de inscrições ainda precisa fornecer esse contrato.
 - **Uso de IA Generativa:**
-
+usei para esclarecer conceitos de sobre a camada de serviço
 ---
 
 ### Felipe Gomes de Mello (@FelipeGMello)
@@ -93,11 +96,11 @@ Nenhuma.
 - **Uso de IA Generativa:** Utilizada para consulta.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
-- **Arquivos sob minha responsabilidade:** 
-- **Intervalo/Hashes de Commits:** 
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:**
+- **Arquivos sob minha responsabilidade:** `src/eventos/service_layer/services.py` e `tests/unit/test_services_pagamento.py`
+- **Intervalo/Hashes de Commits:** Branch `feature/pagamento-services-api`
+- **O que implementei:** Implementei a exceção customizada `PagamentoNaoEncontradoError` e criei as funções de orquestração na camada de serviço (`registrar_pagamento`, `obter_pagamento` e `aprovar_pagamento`). Também construí a suíte de testes unitários para validar todo o fluxo de criação, aprovação e tratamento de erros utilizando repositórios dublês (`FakeInscricaoRepository` e `FakePagamentoRepository`).
+- **Justificativa de decisão de projeto:** Segui o padrão de Service Layer para isolar os casos de uso das regras da API. Dessa forma, a lógica de orquestração do pagamento (validar a inscrição e aplicar a transação) não se acopla ao Flask, permitindo a execução rápida e confiável dos testes unitários antes da entrega das rotas.
+- **Uso de IA Generativa:** A IA foi utilizada como assistente de codificação para agilizar a criação dos testes unitários em Pytest, formatar a estrutura das funções de serviço com injeção de dependência e auxiliar na resolução de problemas de configuração e execução do ambiente virtual no terminal PowerShell.
 
 ---
 
@@ -174,8 +177,8 @@ Nenhuma.
 - **Uso de IA Generativa:** Apoio na estruturação inicial do ORM, implementação e validação dos testes; revisão e decisão final do autor.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
-- **Arquivos sob minha responsabilidade:** 
-- **Intervalo/Hashes de Commits:** 
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
+- **Arquivos sob minha responsabilidade:** src/eventos/service_layer/services.py, src/eventos/entrypoints/flask_app.py e tests/e2e/test_inscricoes_api.py.
+- **Intervalo/Hashes de Commits:** e3fc05d
+- **O que implementei:** Casos de uso de criar, consultar, confirmar e cancelar inscrição. Criei endpoints Flask correspondentes (POST /inscricoes, GET /inscricoes/<id>, POST /inscricoes/<id>/confirmar e POST /inscricoes/<id>/cancelar) e testes e2e que validam a criação, consulta, confirmação, cancelamento e o retorno 404 para inscrição inexistente.
+- **Justificativa de decisão de projeto:** Os fluxos foram concentrados na camada de serviço, que coordena o agregado e o repositório; o endpoint apenas interpreta a requisição, confirma a transação e serializa a resposta. A aplicação recebe uma sessão opcional para permitir testes e2e com SQLite em memória.
 - **Uso de IA Generativa:**

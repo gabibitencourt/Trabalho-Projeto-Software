@@ -1,25 +1,33 @@
 import pytest
-from sqlalchemy.orm import clear_mappers
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
+from eventos.adapters.orm import metadata, start_mappers
 from eventos.adapters.repository import SqlAlchemyInscricaoRepository
 from eventos.domain.model import Inscricao, Participante
 from eventos.entrypoints.flask_app import create_app
 
 
 @pytest.fixture
-def app():
-    aplicacao = create_app("sqlite:///:memory:")
-    yield aplicacao
-    clear_mappers()
+def session():
+    start_mappers()
+    engine = create_engine("sqlite:///:memory:")
+    metadata.create_all(engine)
+    return sessionmaker(bind=engine)()
 
 
 @pytest.fixture
-def client(app):
-    return app.test_client()
+def client(session):
+    app = create_app(session)
+    app.config["TESTING"] = True
+
+    with app.test_client() as client:
+        yield client
+
+    session.close()
 
 
-def _criar_inscricao(app, identificador=1):
-    session = app.session_factory()
+def _criar_inscricao(session, identificador=1):
     participante = Participante(
         identificador=identificador,
         nome=f"Participante {identificador}",
@@ -31,49 +39,67 @@ def _criar_inscricao(app, identificador=1):
         Inscricao(identificador=identificador, participante=participante, lote="Primeiro lote")
     )
     session.commit()
-    session.close()
 
 
-def test_processa_pagamento_aprovado(app, client):
-    _criar_inscricao(app)
+def test_registra_e_consulta_pagamento(session, client):
+    _criar_inscricao(session)
 
     resposta = client.post(
         "/pagamentos",
-        json={"identificador": 1, "inscricao_id": 1, "valor": 150, "aprovado": True},
+        json={"identificador": 1, "inscricao_id": 1, "valor": 150},
     )
 
     assert resposta.status_code == 201
-    assert resposta.get_json() == {"identificador": 1, "status": "aprovado"}
+    assert resposta.get_json()["status"] == "pendente"
 
-
-def test_processa_pagamento_para_inscricao_inexistente(app, client):
-    resposta = client.post(
-        "/pagamentos",
-        json={"identificador": 1, "inscricao_id": 999, "valor": 150, "aprovado": True},
-    )
-
-    assert resposta.status_code == 400
-
-
-def test_confirma_inscricao_apos_pagamento_aprovado(app, client):
-    _criar_inscricao(app)
-    client.post(
-        "/pagamentos",
-        json={"identificador": 1, "inscricao_id": 1, "valor": 150, "aprovado": True},
-    )
-
-    resposta = client.post("/pagamentos/1/confirmar-inscricao")
+    resposta = client.get("/pagamentos/1")
 
     assert resposta.status_code == 200
+    assert resposta.get_json()["valor"] == 150
 
 
-def test_nao_confirma_inscricao_com_pagamento_recusado(app, client):
-    _criar_inscricao(app)
-    client.post(
+def test_registra_pagamento_para_inscricao_inexistente(session, client):
+    resposta = client.post(
         "/pagamentos",
-        json={"identificador": 1, "inscricao_id": 1, "valor": 150, "aprovado": False},
+        json={"identificador": 1, "inscricao_id": 999, "valor": 150},
     )
+
+    assert resposta.status_code == 404
+
+
+def test_aprova_pagamento_e_confirma_inscricao(session, client):
+    _criar_inscricao(session)
+    client.post("/pagamentos", json={"identificador": 1, "inscricao_id": 1, "valor": 150})
+
+    resposta = client.post("/pagamentos/1/aprovar")
+    assert resposta.status_code == 200
+    assert resposta.get_json()["status"] == "aprovado"
+
+    resposta = client.post("/pagamentos/1/confirmar-inscricao")
+    assert resposta.status_code == 200
+    assert resposta.get_json()["status"] == "confirmada"
+
+
+def test_recusa_pagamento(session, client):
+    _criar_inscricao(session)
+    client.post("/pagamentos", json={"identificador": 1, "inscricao_id": 1, "valor": 150})
+
+    resposta = client.post("/pagamentos/1/recusar")
+
+    assert resposta.status_code == 200
+    assert resposta.get_json()["status"] == "recusado"
+
+
+def test_nao_confirma_inscricao_com_pagamento_pendente(session, client):
+    _criar_inscricao(session)
+    client.post("/pagamentos", json={"identificador": 1, "inscricao_id": 1, "valor": 150})
 
     resposta = client.post("/pagamentos/1/confirmar-inscricao")
 
     assert resposta.status_code == 400
+
+
+def test_retorna_404_para_pagamento_inexistente(session, client):
+    resposta = client.get("/pagamentos/999")
+
+    assert resposta.status_code == 404
