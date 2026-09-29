@@ -63,11 +63,13 @@ implementei o mapeamento de evento e lode de ingresso para o sqlchemy
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
 - **Arquivos sob minha responsabilidade:** 
+tests/unit/test_service_evento e src/evento/service_layer/services.py
 - **Intervalo/Hashes de Commits:** 
 - **O que implementei:**
-- **Justificativa de decisão de projeto:**
+camada de serviço se evento e os testes pertinentes a camada de serviço.
+- **Justificativa de decisão de projeto:** Para criar eventos sem geração de IDs pelo banco, o serviço escolhe o maior identificador existente mais um. Para encerrar, consulta inscrições através do contrato listar_por_evento(identificador_evento), e conta os status pendentes. a implementação atual do repositório de inscrições ainda precisa fornecer esse contrato.
 - **Uso de IA Generativa:**
-
+usei para esclarecer conceitos de sobre a camada de serviço
 ---
 
 ### Felipe Gomes de Mello (@FelipeGMello)
