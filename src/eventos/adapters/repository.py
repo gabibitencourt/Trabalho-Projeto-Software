@@ -203,3 +203,38 @@ class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
         pagamento = self.obter(identificador)
         if pagamento:
             self.session.delete(pagamento)
+
+class AbstractLoteDeIngressoRepository(abc.ABC):
+    @abc.abstractmethod
+    def adicionar(self, lote: LoteDeIngresso):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def obter(self, identificador: int) -> LoteDeIngresso:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def atualizar(self, lote: LoteDeIngresso):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remover(self, identificador: int):
+        raise NotImplementedError
+
+class SqlAlchemyLoteDeIngressoRepository(AbstractLoteDeIngressoRepository):
+    def __init__(self, session: Session):
+        self.session = session
+
+    def adicionar(self, lote: LoteDeIngresso):
+        self.session.add(lote)
+
+    def obter(self, identificador: int) -> LoteDeIngresso | None:
+        return self.session.get(LoteDeIngresso, identificador)
+
+    def atualizar(self, lote: LoteDeIngresso):
+        self.session.merge(lote)
+
+    def remover(self, identificador: int):
+        lote = self.obter(identificador)
+        if lote:
+            self.session.delete(lote)

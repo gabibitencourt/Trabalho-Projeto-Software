@@ -6,6 +6,8 @@ from eventos.adapters.orm import metadata, start_mappers
 from eventos.adapters.repository import (
     SqlAlchemyInscricaoRepository,
     SqlAlchemyPagamentoRepository,
+    SqlAlchemyEventoRepository,
+    SqlAlchemyLoteDeIngressoRepository
 )
 from eventos.domain.model import OperacaoInvalidaError, Participante
 from eventos.service_layer import services
@@ -38,6 +40,16 @@ def _serializar_pagamento(pagamento):
         "status": pagamento.status.value,
     }
 
+def _serializar_lote(lote):
+    return {
+        "identificador": lote.identificador,
+        "evento_id": lote.evento_id,
+        "nome": lote.nome,
+        "preco": lote.preco,
+        "quant_total": lote.quant_total,
+        "quanto_vendidae": lote.quant_vendida
+    }
+
 
 def create_app(session=None):
     start_mappers()
@@ -48,6 +60,8 @@ def create_app(session=None):
 
     repository = SqlAlchemyInscricaoRepository(session)
     repositorio_pagamento = SqlAlchemyPagamentoRepository(session)
+    repositorio_evento = SqlAlchemyEventoRepository(session)
+    repositorio_lote_ingresso = SqlAlchemyLoteDeIngressoRepository(session)
     app = Flask(__name__)
 
     @app.errorhandler(services.InscricaoNaoEncontradaError)
@@ -148,9 +162,31 @@ def create_app(session=None):
             repositorio_inscricao=repository,
         )
         session.commit()
-        return jsonify(_serializar_inscricao(inscricao))
+        return jsonify(_serializar_inscricao(inscricao))    
 
+    @app.post("/lotes")
+    def registrar_lote():
+        dados = request.get_json(silent=True) or {}
+        try:
+            lote = services.criar_lote_ingresso(
+                repositorio_evento,
+                dados["evento_id"],
+                dados["identificador"],
+                dados["nome"],
+                dados["preco"],
+                dados["quant_total"],
+                dados["quant_vendida"]
+            )
+        except KeyError as error:
+            raise ValueError(f"campo obrigatorio: {error.args[0]}") from error
+
+        session.commit()
+        return jsonify(_serializar_lote(lote)), 201
+
+    @app.get("/lote/<int:identificador>")
+    def obter_lote(identificador):
+        lote = services.obter_lote(repositorio_lote_ingresso, identificador)
+        return jsonify(_serializar_lote(lote))
     return app
-
 
 app = create_app()

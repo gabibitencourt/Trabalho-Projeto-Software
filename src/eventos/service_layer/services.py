@@ -8,6 +8,7 @@ from eventos.domain.model import (
     StatusEvento,
     StatusInscricao,
     StatusPagamento,
+    LoteDeIngresso,
 )
 
 
@@ -143,3 +144,15 @@ def confirmar_inscricao_apos_pagamento(
     pagamento.inscricao.confirmar()
     repositorio_inscricao.atualizar(pagamento.inscricao)
     return pagamento.inscricao
+
+def criar_lote_ingresso(repositorio_evento, evento_id, identificador, nome, preco, quant_total, quant_vendida=0):    
+    if repositorio_evento.obter(evento_id) is None:
+        raise Exception("Evento nao encontrado.")
+        
+    return LoteDeIngresso(identificador, nome, preco, quant_total, quant_vendida)
+
+def obter_lote(repositorio, identificador):
+    lote = repositorio.obter(identificador)
+    if lote is None:
+        raise Exception("Lote nao encontrado.")
+    return lote
