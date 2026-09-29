@@ -70,3 +70,29 @@ def test_retorna_404_para_inscricao_inexistente(client):
 
     assert resposta.status_code == 404
     assert resposta.get_json()["erro"] == "inscricao nao encontrada"
+
+def test_realiza_checkin_com_sucesso(client):
+    # 1. Cria a inscrição (ela nasce como PENDENTE)
+    client.post("/inscricoes", json=dados_da_inscricao())
+    
+    # 2. Confirma a inscrição (regra do domínio exige isso para o check-in)
+    client.post("/inscricoes/1/confirmar")
+
+    # 3. Realiza o check-in
+    resposta = client.post("/inscricoes/1/checkin")
+
+    assert resposta.status_code == 200
+    # Valida se a chave 'checkin' não é mais nula, conforme sua serialização
+    assert resposta.get_json()["checkin"] is not None
+
+
+def test_nao_permite_checkin_em_inscricao_pendente(client):
+    # 1. Cria a inscrição (ela nasce como PENDENTE)
+    client.post("/inscricoes", json=dados_da_inscricao())
+
+    # 2. Tenta fazer check-in direto, sem confirmar
+    resposta = client.post("/inscricoes/1/checkin")
+
+    # 3. Deve falhar com erro 400 (OperacaoInvalidaError)
+    assert resposta.status_code == 400
+    assert "check-in exige inscricao confirmada" in resposta.get_json()["erro"]
