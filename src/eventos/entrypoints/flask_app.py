@@ -40,6 +40,17 @@ def _serializar_pagamento(pagamento):
         "status": pagamento.status.value,
     }
 
+
+def _serializar_evento(evento):
+    return {
+        "identificador": evento.identificador,
+        "nome": evento.nome,
+        "data": evento.data.isoformat(),
+        "local": evento.local,
+        "status": evento.status.value,
+    }
+
+
 def _serializar_lote(lote):
     return {
         "identificador": lote.identificador,
@@ -75,6 +86,55 @@ def create_app(session=None):
     @app.errorhandler(OperacaoInvalidaError)
     def operacao_invalida(error):
         return jsonify({"erro": str(error)}), 400
+
+    @app.post("/eventos")
+    def criar_evento():
+        dados = request.get_json(silent=True) or {}
+        try:
+            identificador = services.criar_evento(
+                repositorio_evento,
+                nome=dados["nome"],
+                data=dados["data"],
+                local=dados["local"],
+            )
+        except KeyError as error:
+            raise ValueError(f"campo obrigatorio: {error.args[0]}") from error
+
+        session.commit()
+        evento = repositorio_evento.obter(identificador)
+        return jsonify(_serializar_evento(evento)), 201
+
+    @app.get("/eventos")
+    def listar_eventos():
+        eventos = repositorio_evento.listar()
+        return jsonify([_serializar_evento(evento) for evento in eventos])
+
+    @app.get("/eventos/<int:identificador>")
+    def obter_evento(identificador):
+        evento = repositorio_evento.obter(identificador)
+        if evento is None:
+            return jsonify({"erro": "evento nao encontrado"}), 404
+        return jsonify(_serializar_evento(evento))
+
+    @app.post("/eventos/<int:identificador>/encerrar")
+    def encerrar_evento(identificador):
+        if not callable(getattr(repository, "listar_por_evento", None)):
+            return jsonify({
+                "erro": "encerramento indisponivel: repositorio de inscricoes nao implementa listar_por_evento"
+            }), 501
+
+        try:
+            services.encerrar_evento(
+                repositorio_evento,
+                repository,
+                identificador,
+            )
+        except LookupError as error:
+            return jsonify({"erro": str(error)}), 404
+
+        session.commit()
+        evento = repositorio_evento.obter(identificador)
+        return jsonify(_serializar_evento(evento))
 
     @app.errorhandler(ValueError)
     def requisicao_invalida(error):
