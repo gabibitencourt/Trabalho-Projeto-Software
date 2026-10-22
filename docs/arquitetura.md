@@ -147,6 +147,34 @@ Nos testes, o cliente Flask recebe uma sessão SQLite em memória, o que permite
 
 A escolha por camadas, entidades com invariantes e repositórios é adequada para o porte atual e facilita testes focados. A evidência não sustenta, porém, que o sistema já esteja plenamente hexagonal ou pronto para crescer como um fluxo transacional consistente: o entrypoint seleciona infraestrutura, o commit está nas rotas e contratos entre agregados estão incompletos. A prioridade arquitetural mais valiosa é completar os contratos de persistência necessários aos casos de uso e tornar explícita a fronteira transacional; introduzir mensageria ou CQRS antes disso aumentaria o custo sem resolver as lacunas atuais.
 
+## Análise de trade-offs
+
+A arquitetura do sistema adota princípios de *Clean Architecture* e *Domain-Driven Design (DDD)*, isolando o núcleo de regras de negócio de frameworks e detalhes de persistência. Essa abordagem prioriza testabilidade e integridade das regras, gerando custos de sobrecarga e complexidade estrutural que se manifestam nos trade-offs a seguir:
+
+### 1. Camada de Serviço e Repositórios vs. Lógica Direta nas Rotas
+- **Decisão adotada:** Casos de uso (`services.py`) orquestram o ciclo de vida dos agregados recebendo instâncias de repositórios (`Abstract*Repository`), enquanto a API Flask atua apenas como adaptador fino de entrada e serialização.
+- **Trade-off:**
+  - *Vantagens:* Permite exercitar 100% dos fluxos de negócio (como `registrar_pagamento` e `aprovar_pagamento`) e suas invariantes em testes unitários ultra-rápidos (`tests/unit/test_services_pagamento.py`) operando em memória via `FakePagamentoRepository` e `FakeInscricaoRepository`, sem latência de I/O de banco de dados ou do servidor HTTP.
+  - *Custos:* Sobrecarga estrutural (*boilerplate*). Para cada operação, exige-se a definição de interfaces abstratas, repositórios falsos para testes, implementações concretas em SQLAlchemy, funções de serviço e rotas Flask correspondentes.
+
+### 2. Mapeamento Imperativo (*Classical Mapping*) vs. ORM Declarativo
+- **Decisão adotada:** Uso de `mapper_registry.map_imperatively` em `adapters/orm.py` mapeando tabelas nativas (`Table`) diretamente nas classes puras de `domain/model.py`, mantendo as entidades livres de classes-base do SQLAlchemy.
+- **Trade-off:**
+  - *Vantagens:* Total pureza do modelo de domínio; classes como `Evento`, `Inscricao` e `Pagamento` comportam-se como objetos Python puros, facilmente instanciáveis em qualquer contexto de teste sem exigir sessões abertas ou motores de banco.
+  - *Custos:* Mapeamentos manuais complexos. Relações entre agregados (como `properties={"inscricao": relationship(Inscricao)}` em `Pagamento` e `_lotes` em `Evento`) exigem configurações meticulosas de carregamento e cascatas, criando inconsistências quando contratos sofrem alterações sem atualização imediata dos mappers.
+
+### 3. Integridade e Invariantes no Domínio vs. Simplicidade de Persistência
+- **Decisão adotada:** Métodos de negócio residem no domínio e protegem transições de estado levantando `OperacaoInvalidaError` (ex.: `Pagamento.aprovar()` exige status pendente; `Pagamento.estornar()` valida se `inscricao.checkin_realizado` é falso).
+- **Trade-off:**
+  - *Vantagens:* As regras do negócio não se dispersam pelas rotas ou queries SQL, garantindo que o estado interno das entidades nunca seja corrompido, independentemente do ponto de entrada que invoque o modelo.
+  - *Custos:* Exige carregar agregados completos pela raiz antes de invocar comandos, limitando operações em lote e consultas de leitura direta, que no futuro podem demandar uma divisão explícita de CQRS para ganhos de performance.
+
+### 4. Monolito Síncrono Modular vs. Arquitetura Orientada a Eventos
+- **Decisão adotada:** Execução síncrona e em memória de todos os fluxos entre agregados dentro de um único pacote monolítico.
+- **Trade-off:**
+  - *Vantagens:* Facilidade de implantação, execução e automação de testes determinísticos na pipeline do GitHub Actions sem dependência de brokers de mensagens, filas ou transações distribuídas (Sagas).
+  - *Custos:* Acoplamento temporal entre agregados (ex.: encerramento de evento dependendo da contagem síncrona de inscrições pendentes; pagamento associado diretamente ao ciclo de inscrição).
+
 ## Referências no código
 
 - `src/eventos/domain/model.py`
