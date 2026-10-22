@@ -1,3 +1,12 @@
+## Escopo
+
+O sistema é uma plataforma para gestão completa de eventos, englobando a criação e organização de eventos, controle de estoque de lotes de ingressos, inscrições de participantes, processamento de pagamentos e verificação de check-in no dia do evento. Ele atende a dois perfis principais de usuários:
+
+1. **Organizadores:** responsáveis pela criação e gestão dos eventos e pela definição dos lotes de ingressos (preços e quantidades).
+2. **Participantes:** usuários que se inscrevem em lotes disponíveis, realizam o pagamento e efetuam o check-in na entrada do evento.
+
+A arquitetura do sistema foi projetada para garantir a integridade das regras de negócio (como limitação de vagas por lote, validação cadastral de participantes e bloqueio de check-in para inscrições pendentes), assegurando que as invariantes de domínio permaneçam isoladas dos detalhes de infraestrutura (banco de dados SQLite e API HTTP em Flask).
+
 # Arquitetura do sistema
 
 ## Visão geral
