@@ -27,6 +27,17 @@ Este documento registra as contribuições individuais e as decisões de projeto
 - **Justificativa de decisão de projeto:** Foquei na entrega completa (Serviço + API + Testes) do Caso de Uso 7, pois as invariantes dessa entidade já estavam consolidadas.
 - **Uso de IA Generativa:** Usei a IA de apoio para esclarecer a estrutura dos repositórios e para entender melhor a camada de serviço.
 
+## Fase 2 (Semana 5 a 14)
+
+### Gabriela Bitencourt Freire da Silva (@gabibitencourt)
+
+#### Checkpoint 1 (22/10/2026) - Arquitetura e ADRs
+- **Arquivos sob minha responsabilidade:** `docs/arquitetura.md`, `docs/adr/0002-uso-de-set-em-fake-repository.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** 
+- **O que implementei:** Redação da seção de Escopo no documento de arquitetura (`docs/arquitetura.md`) e elaboração de Architecture Decision Records em `docs/adr/` documentando a escolha de estruturas de dados para os repositórios em memória (*Fake Repositories*).
+- **Justificativa de decisão de projeto:** Manteve-se a autovalidação nos construtores do domínio para assegurar que chamadas de serviço e cenários de testes não instanciem participantes ou organizadores inconsistentes.
+- **Uso de IA Generativa:** Utilização de assistente de IA para formatação dos arquivos ADR segundo os critérios da disciplina.
+
 ---
 
 ### Arthur Siqueira Campos Alexandrino (@devalexandrino)
