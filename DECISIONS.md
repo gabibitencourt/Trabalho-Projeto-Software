@@ -33,7 +33,7 @@ Este documento registra as contribuições individuais e as decisões de projeto
 
 #### Checkpoint 1 (22/10/2026) - Arquitetura e ADRs
 - **Arquivos sob minha responsabilidade:** `docs/arquitetura.md`, `docs/adr/0002-uso-de-set-em-fake-repository.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** 
+- **Intervalo/Hashes de Commits:** 5cd00449f33a87be3a6600ae61ee3feb6df47a8c, 45a76c426e337535f082a14fbb57dc543c745cbe, 1ac5b5c0aca278e5948b3339b54943dc5f1fcc0e
 - **O que implementei:** Redação da seção de Escopo no documento de arquitetura (`docs/arquitetura.md`) e elaboração de Architecture Decision Records em `docs/adr/` documentando a escolha de estruturas de dados para os repositórios em memória (*Fake Repositories*).
 - **Justificativa de decisão de projeto:** Manteve-se a autovalidação nos construtores do domínio para assegurar que chamadas de serviço e cenários de testes não instanciem participantes ou organizadores inconsistentes.
 - **Uso de IA Generativa:** Utilização de assistente de IA para formatação dos arquivos ADR segundo os critérios da disciplina.
