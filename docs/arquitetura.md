@@ -175,6 +175,63 @@ A arquitetura do sistema adota princípios de *Clean Architecture* e *Domain-Dri
   - *Vantagens:* Facilidade de implantação, execução e automação de testes determinísticos na pipeline do GitHub Actions sem dependência de brokers de mensagens, filas ou transações distribuídas (Sagas).
   - *Custos:* Acoplamento temporal entre agregados (ex.: encerramento de evento dependendo da contagem síncrona de inscrições pendentes; pagamento associado diretamente ao ciclo de inscrição).
 
+## Alternativa
+
+### Alternativa proposta: Unit of Work + Message Bus com eventos de domínio
+
+A alternativa avaliada mantém as camadas e o modelo de domínio atuais, mas muda **quem controla a transação** e **como os agregados se comunicam**, seguindo os capítulos 6 a 9 do livro-texto (*Architecture Patterns with Python*):
+
+1. **Unit of Work (UoW):** um `AbstractUnitOfWork` agrupa os repositórios (`eventos`, `inscricoes`, `pagamentos`) e expõe `commit()`/`rollback()`. Os serviços passam a receber a UoW em vez de repositórios avulsos e chamam `uow.commit()` ao final do caso de uso. As rotas Flask deixam de chamar `session.commit()` e de instanciar `SqlAlchemy*Repository`; recebem apenas uma `SqlAlchemyUnitOfWork` (ou `FakeUnitOfWork` nos testes).
+2. **Eventos de domínio e Message Bus:** as entidades registram eventos em uma lista `eventos` quando uma transição relevante acontece (ex.: `Pagamento.aprovar()` gera `PagamentoAprovado`; `LoteDeIngresso.venda()` na última vaga gera `LoteEsgotado`; `Inscricao.realizar_checkin()` gera `CheckinRealizado`). Após o commit, a UoW coleta esses eventos e um `MessageBus` em processo os despacha para *handlers* (ex.: `PagamentoAprovado` → confirmar inscrição; `InscricaoConfirmada` → `FakeNotifier`).
+
+```mermaid
+flowchart TD
+    Cliente[Cliente HTTP]
+    Flask[Flask API<br/>só tradução HTTP]
+    Bus[Message Bus<br/>comandos e eventos]
+    Handlers[Handlers<br/>casos de uso]
+    UoW[Unit of Work<br/>commit / rollback + coleta de eventos]
+    Repos[Repositórios<br/>Fake ou SQLAlchemy]
+    Model[Domínio<br/>entidades registram eventos]
+    DB[(SQLite)]
+
+    Cliente --> Flask --> Bus --> Handlers
+    Handlers --> UoW --> Repos --> DB
+    Handlers --> Model
+    UoW -. eventos coletados .-> Bus
+```
+
+### O que muda em relação à arquitetura atual
+
+| Aspecto | Atual | Alternativa |
+|---|---|---|
+| Fronteira transacional | `session.commit()` em cada rota de `flask_app.py` (12 ocorrências) | `uow.commit()` dentro do serviço/handler; rotas sem SQLAlchemy |
+| Composição de infraestrutura | `create_app()` instancia quatro `SqlAlchemy*Repository` | `create_app()` recebe uma única fábrica de UoW |
+| Fluxo Pagamento → Inscrição | Cliente precisa chamar `POST /pagamentos/<id>/confirmar-inscricao` após aprovar | `PagamentoAprovado` dispara o handler de confirmação automaticamente |
+| Estoque do lote | `criar_inscricao` não chama `LoteDeIngresso.venda()`; `lote` é texto | Handler de inscrição carrega o lote pela UoW, chama `venda()` e persiste ambos na mesma transação |
+| Testes de serviço | Cada teste monta repositórios Fake separados | Um `FakeUnitOfWork` com flag `committed` permite verificar também se houve commit |
+| Eventos de domínio (Fase 2) | Não existem | `PagamentoAprovado`, `InscricaoConfirmada`, `LoteEsgotado`, `CheckinRealizado` (já previstos em `PROPOSTA.md`) |
+
+### Avaliação frente aos atributos de qualidade
+
+- **Testabilidade (alta):** melhora. Os serviços continuam testáveis em memória, e passa a ser possível testar a fronteira transacional (que hoje só é exercitada nos testes E2E, pelo commit da rota) e o encadeamento entre agregados via eventos, sem Flask.
+- **Integridade das regras (média-alta):** melhora. Inscrição, venda no lote e aprovação de pagamento ficam numa mesma unidade atômica; se qualquer invariante falhar, a UoW faz `rollback` e nada é persistido. Hoje uma inscrição pode ser criada sem consumir vaga do lote, porque o vínculo não passa por uma transação comum.
+- **Modificabilidade (média):** melhora no entrypoint (Flask deixa de conhecer SQLAlchemy, cumprindo de fato o Ports & Adapters descrito na Visão geral) e no acoplamento entre agregados (Pagamento não precisa conhecer o fluxo de Inscrição). Piora na rastreabilidade: o caminho de execução fica indireto, pois um evento pode acionar vários handlers.
+
+### Custos e riscos
+
+- **Mais estrutura:** novas classes (`AbstractUnitOfWork`, `SqlAlchemyUnitOfWork`, `FakeUnitOfWork`, `MessageBus`, classes de evento) e refatoração de todas as assinaturas de `services.py` e das rotas, num momento em que seis integrantes mexem nos mesmos arquivos.
+- **Consistência eventual dentro do processo:** handlers disparados após o commit rodam em transações separadas; se a confirmação da inscrição falhar depois de o pagamento ser aprovado, o estado fica inconsistente até haver reprocessamento ou compensação.
+- **Depuração mais difícil:** a sequência "aprovar pagamento → confirmar inscrição → notificar" deixa de estar explícita em uma única função.
+
+### Alternativa descartada: Active Record (ORM declarativo nas entidades)
+
+Também foi considerada a direção oposta, de simplificar: entidades herdando de `declarative_base()` e rotas acessando o ORM diretamente, eliminando repositórios abstratos e Fakes. Reduziria o *boilerplate* apontado no trade-off 1, mas tornaria impossível testar o domínio sem banco, quebrando o atributo de maior prioridade (testabilidade) e a restrição de mapeamento não intrusivo. Por isso foi descartada.
+
+### Recomendação
+
+Adotar a alternativa **de forma incremental**: primeiro a Unit of Work (resolve a limitação de "fronteira de transação no entrypoint" e o estoque de lote não atualizado, com baixo risco), depois os eventos de domínio e o Message Bus, já exigidos pela Fase 2. Introduzir o Message Bus antes da UoW repetiria o problema apontado na Avaliação: complexidade nova sem resolver a lacuna transacional. A decisão está registrada no [ADR-004](adr/004-unit-of-work-e-message-bus.md).
+
 ## Referências no código
 
 - `src/eventos/domain/model.py`
