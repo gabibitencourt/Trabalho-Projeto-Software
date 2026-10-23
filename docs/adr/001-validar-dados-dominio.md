@@ -5,7 +5,7 @@ Este arquivo reúne decisões de arquitetura registradas durante a Fase 1 e deci
 ## ADR-001 - Validar dados de participante e organizador no domínio
 
 - **Status:** Aceito e implementado
-- **Autora:** Gabriela Bitencourt Freire da Silva
+- **Autor:** Felipe Gomes de Mello
 
 ### Contexto
 
