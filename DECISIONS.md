@@ -167,6 +167,13 @@ Nenhuma.
 - **Uso de IA Generativa (conforme Seção 2.5):**
 - **Simplificações conscientes:** Sessão do SQLAlchemy criada uma vez por chamada de create_app e compartilhada entre as rotas de inscrição e pagamento, sem pool de conexões nem autenticação; nao ha integracao com gateway de pagamento real, aprovar/recusar/estornar sao chamados diretamente via API.
 
+#### Checkpoint 1 (22/10/2026) - Arquitetura e ADR do Pagamento
+- **Arquivos sob minha responsabilidade:** `docs/arquitetura.md` (seção Evidências), `docs/adr/005-transicoes-estado-pagamento.md`
+- **Intervalo/Hashes de Commits:**
+- **O que implementei:** Seção de Evidências do documento de arquitetura, com quatro afirmações apoiadas em dados do próprio repositório (custo em camadas por caso de uso, tempo comparado das suítes unit/e2e, linhas de mapeamento em `orm.py` e o ganho/custo do `FakePagamentoRepository` frente ao `SqlAlchemyPagamentoRepository`). Escrevi também o ADR-005, registrando a decisão (já tomada na Fase 1) de implementar as transições do `Pagamento` como métodos (`aprovar`, `recusar`, `estornar`) guardados por comparação contra `StatusPagamento`, em vez de um campo de status livre.
+- **Justificativa de decisão de projeto:** O ADR cobre as transições de `recusar`/`estornar`, que ficaram fora do ADR-003 (do João, sobre a orquestração de `registrar`/`obter`/`aprovar` na camada de serviço) — registrando especificamente por que a guarda de pré-condição fica no método da entidade, e não repetida na camada de serviço ou na rota.
+- **Uso de IA Generativa (conforme Seção 2.5):**
+
 ---
 
 ### Samuel Carvalho Dias (@SamuelCDiias)

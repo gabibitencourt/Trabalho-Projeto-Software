@@ -232,6 +232,16 @@ Também foi considerada a direção oposta, de simplificar: entidades herdando d
 
 Adotar a alternativa **de forma incremental**: primeiro a Unit of Work (resolve a limitação de "fronteira de transação no entrypoint" e o estoque de lote não atualizado, com baixo risco), depois os eventos de domínio e o Message Bus, já exigidos pela Fase 2. Introduzir o Message Bus antes da UoW repetiria o problema apontado na Avaliação: complexidade nova sem resolver a lacuna transacional. A decisão está registrada no [ADR-004](adr/004-unit-of-work-e-message-bus.md).
 
+## Evidências
+
+1. **Custo em camadas por caso de uso.** O commit `e95754b` ("add: servico_criar_lote e testes") implementa um único caso de uso novo — criar lote de ingressos — e precisa tocar três camadas e um nível de teste na mesma mudança: `adapters/repository.py` (+37), `service_layer/services.py` (+13), `entrypoints/flask_app.py` (+40) e `tests/e2e/test_criar_lote.py` (+40), em 4 arquivos e 127 linhas. Já o caso de uso de check-in foi dividido em três commits sequenciais do mesmo autor, um por camada (`ea860a0` no serviço, 6 linhas; `59b34fe` na rota, 6 linhas; `f4f50c0` no teste e2e, 26 linhas) — confirmando que a arquitetura em camadas permite isolar e revisar cada fronteira separadamente, ao custo de nenhuma mudança de negócio ficar contida em um único arquivo.
+
+2. **Tempo da suíte unitária comparado ao da e2e.** Rodando os três níveis isoladamente: `tests/unit` (64 testes) termina em 0,05s; `tests/e2e` (18 testes, cliente Flask + SQLite) termina em 0,36s. O custo por teste sobe de ~0,0008s para ~0,02s, cerca de 25 vezes mais lento, porque cada teste e2e aciona a fixture `session` de `tests/conftest.py`, que cria um `engine` SQLite em memória e chama `start_mappers()`/`clear_mappers()` a cada execução. Isso sustenta a prioridade de Testabilidade declarada na Seção de requisitos: a suíte unitária, usada no dia a dia, paga um custo de I/O praticamente nulo.
+
+3. **Linhas de mapeamento em `orm.py`.** O mapeamento imperativo das seis classes de domínio ocupa 114 linhas em `src/eventos/adapters/orm.py`, sem nenhuma regra de negócio — só `Table`, `Column` e `relationship`. Isso equivale a 53% do tamanho de `src/eventos/domain/model.py` (215 linhas), onde de fato residem as invariantes dos três agregados. É o preço concreto do mapeamento não intrusivo: cada classe nova de domínio custa, em média, ~19 linhas de mapeamento à parte.
+
+4. **Onde o Fake Repository poupou trabalho.** `tests/unit/test_pagamento_repository.py` (Fake, 66 linhas) não depende de nenhuma fixture de banco — instancia `FakePagamentoRepository()` e testa direto. Já `tests/integration/test_repository_pagamento.py` (SQLAlchemy, 48 linhas) depende da fixture `session`, que monta engine e mapeadores antes de cada teste. O Fake elimina esse custo de inicialização nos testes de regra de negócio, ao preço de manter duas implementações do mesmo contrato (`AbstractPagamentoRepository`) sincronizadas manualmente — sem um teste de contrato compartilhado entre as duas, o que é um risco presente, não só teórico.
+
 ## Referências no código
 
 - `src/eventos/domain/model.py`
