@@ -1,5 +1,5 @@
 import pytest
-from eventos.domain.model import Participante
+from eventos.domain.model import Participante, Documento, Email
 
 def criar_participante():
     return Participante(
@@ -36,9 +36,24 @@ def test_altera_email_do_participante():
 
     assert participante.email == "novo_email@email.com"
 
-
 def test_nao_altera_email_para_formato_invalido():
     participante = criar_participante()
 
     with pytest.raises(ValueError, match="email invalido"):
         participante.alterar_email("email_sem_arroba")
+
+def test_value_object_email_valido_e_normalizado():
+    email = Email("  GABI@EMAIL.COM ")
+    assert email.valor == "gabi@email.com"
+
+def test_value_object_email_invalido_dispara_erro():
+    with pytest.raises(ValueError, match="email invalido"):
+        Email("email_sem_arroba")
+
+def test_value_object_documento_valido_e_sanitizado():
+    doc = Documento("123.456.789-00")
+    assert doc.valor == "12345678900"
+
+def test_value_object_documento_invalido_dispara_erro():
+    with pytest.raises(ValueError, match="documento invalido"):
+        Documento("123")

@@ -152,29 +152,44 @@ class Pagamento:
 			)
 		self.status = StatusPagamento.ESTORNADO
 
-class Participante:
+class Documento:
+    """Value Object que encapsula a regra de sanitização e validação de documentos (CPF/CNPJ)."""
+    def __init__(self, valor: str):
+        doc_limpo = re.sub(r"\D", "", valor or "")
+        if len(doc_limpo) not in (11, 14):
+            raise ValueError("documento invalido")
+        self.valor = doc_limpo
 
+    def __eq__(self, outro):
+        return isinstance(outro, Documento) and self.valor == outro.valor
+
+
+class Email:
+    """Value Object que encapsula a validação e normalização de e-mails."""
+    def __init__(self, valor: str):
+        if not valor or "@" not in valor:
+            raise ValueError("email invalido")
+        self.valor = valor.lower().strip()
+
+    def __eq__(self, outro):
+        return isinstance(outro, Email) and self.valor == outro.valor
+
+
+class Participante:
     def __init__(self, identificador, nome, email, documento):
         if not nome or not nome.strip():
             raise ValueError("nome obrigatorio")
 
-        doc_limpo = re.sub(r"\D", "", documento or "")
-        if len(doc_limpo) not in (11, 14):
-            raise ValueError("documento invalido")
-
-        if not email or "@" not in email:
-            raise ValueError("email invalido")
-
         self.identificador = identificador
         self.nome = nome.strip()
-        self.email = email.lower().strip()
-        self.documento = doc_limpo
+        
+        # Delega a validação/sanitização para os Value Objects e armazena o valor processado
+        self.email = email.valor if isinstance(email, Email) else Email(email).valor
+        self.documento = documento.valor if isinstance(documento, Documento) else Documento(documento).valor
 
     def alterar_email(self, novo_email):
-        if not novo_email or "@" not in novo_email:
-            raise ValueError("email invalido")
-        self.email = novo_email.lower().strip()
-
+        self.email = novo_email.valor if isinstance(novo_email, Email) else Email(novo_email).valor
+        
 class Organizador:
 
     def __init__(
