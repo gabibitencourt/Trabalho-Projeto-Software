@@ -40,7 +40,7 @@ Este documento registra as contribuições individuais e as decisões de projeto
 
 #### Checkpoint 2 (03/11/2026) - Refatoração SOLID
 - **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py`, `tests/unit/test_participante.py`, `docs/solid.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** 
+- **Intervalo/Hashes de Commits:** ae8f93540c6a73286e931f6d16591dd91ee87429, 175b151fe58540da8f7a4407e8f4d3abf4dfe69b
 - **O que implementei:** Refatoração da classe `Participante` para corrigir violação do SRP (Princípio da Responsabilidade Única) através da extração dos Value Objects `Documento` e `Email`. Elaboração da documentação da refatoração em `docs/solid.md`.
 - **Justificativa de decisão de projeto:** O isolamento das regras de validação em Value Objects impede que a entidade `Participante` precise ser alterada caso novas regras de formatação de documentos ou e-mails sejam adotadas.
 - **Uso de IA Generativa:** Utilização de assistente de IA para suporte na estruturação da refatoração em Python preservando compatibilidade com o ORM.
