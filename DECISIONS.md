@@ -99,10 +99,10 @@ usei para esclarecer conceitos de sobre a camada de serviço
 
 #### Checkpoint 2 (03/11/2026) - Refatoração SOLID
 - **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py`, `tests/unit/test_evento.py`, `docs/solid.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** antes: `53a858b`; depois: `<hash-do-commit-da-refatoracao>`
+- **Intervalo/Hashes de Commits:** antes: `53a858b`; depois: `a3e8858744`
 - **O que implementei:** Refatoração da classe `Evento` (método `alterar_lote`) para corrigir violação do OCP (Princípio Aberto/Fechado), extraindo a interface abstrata `RegraAlteracaoLote` e as implementações `RegraNaoReduzirCapacidadeAbaixoDoVendido` e `RegraNaoAlterarPrecoComVendas`. Adição de testes unitários em `tests/unit/test_evento.py` e documentação completa da refatoração em `docs/solid.md`.
 - **Justificativa de decisão de projeto:** Como regras de alteração de lote comparam o estado anterior (`lote_atual`) com o novo (`lote_atualizado`) — a exemplo da invariante de não reduzir a capacidade total abaixo da quantidade já vendida —, concentrar essas verificações diretamente em `Evento.alterar_lote` obrigaria a modificar a classe `Evento` a cada nova política de negócio. Com a abstração `RegraAlteracaoLote` e uma tupla padrão de regras no atributo de classe `_regras_alteracao_lote`, `Evento` fica fechado para modificação e aberto para extensão sem quebrar a reconstrução de objetos pelo mapeamento clássico do SQLAlchemy (`map_imperatively`).
-- **Uso de IA Generativa (conforme Seção 2):** Utilização de assistente de IA para análise do histórico do repositório, identificação da violação de OCP no agregado `Evento`, e estruturação da documentação em `docs/solid.md` e `DECISIONS.md`, com revisão e validação final.
+- **Uso de IA Generativa (conforme Seção 2):** Utilização de assistente de IA para análise do histórico do repositório, identificação da violação de OCP no agregado `Evento`, e estruturação da documentação em `docs/solid.md` e `DECISIONS.md`, com revisão e validação final do autor.
 ---
 
 ### Felipe Gomes de Mello (@FelipeGMello)

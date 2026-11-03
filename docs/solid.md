@@ -167,7 +167,7 @@ A mudança adiciona uma classe interna e uma camada de delegação entre `Evento
 - **Agregado / Módulo:** Evento (`Evento` em `src/eventos/domain/model.py`)
 - **Princípio Violado:** OCP (Open/Closed Principle — Princípio Aberto/Fechado)
 - **Commit "antes":** `53a858b` (16/09/2026)
-- **Commit "depois":** `<hash-do-commit-da-refatoracao>`
+- **Commit "depois":** ` a3e8858744`
 
 ### 1. Problema
 
