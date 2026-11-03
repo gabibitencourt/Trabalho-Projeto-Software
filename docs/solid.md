@@ -102,3 +102,60 @@ Agora o serviço depende só da abstração (`AbstractInscricaoRepository`), e n
 - Só os casos de uso de inscrição foram alterados; as outras rotas ainda chamam `session.commit()`.
 
 Compensa porque o caso de uso fica completo sozinho (não depende da rota lembrar de salvar), dá para testar o commit sem banco e é um passo em direção à Unit of Work do ADR-004.
+
+---
+
+## Refatoração — FelipeGMello
+
+- **Agregado / Módulo:** Evento (`Evento`)
+- **Princípio Violado:** SRP (Single Responsibility Principle — Princípio da Responsabilidade Única)
+- **Commit "antes":** `e95754b` (FelipeGMello)
+- **Commit "depois":** `bfb9d1d` (FelipeGMello)
+
+### 1. Problema
+
+A classe `Evento` controlava tanto o catálogo de lotes quanto as regras do ciclo de vida do evento. As validações de transição (`iniciar` e `encerrar`) e a condição de que os lotes só podem ser alterados enquanto o evento está planejado ficavam junto da gestão da coleção de lotes. Assim, mudanças nas regras de estado exigiam alterar a entidade que também coordena a coleção, espalhando a política de ciclo de vida por operações diferentes.
+
+### 2. Trecho de Código Antes
+
+```python
+def _exigir_evento_planejado(self):
+    if self.status is not StatusEvento.PLANEJADO:
+        raise OperacaoInvalidaError(
+            "nao e possivel alterar lotes de evento em andamento ou encerrado"
+        )
+
+def iniciar(self):
+    if self.status is StatusEvento.EM_ANDAMENTO:
+        raise OperacaoInvalidaError("evento ja esta em andamento")
+    if self.status is StatusEvento.ENCERRADO:
+        raise OperacaoInvalidaError("evento ja esta encerrado")
+    self.status = StatusEvento.EM_ANDAMENTO
+
+def encerrar(self, inscricoes_pendentes):
+    if inscricoes_pendentes < 0:
+        raise ValueError("a quantidade de inscricoes pendentes nao pode ser negativa")
+    if self.status is StatusEvento.ENCERRADO:
+        raise OperacaoInvalidaError("evento ja esta encerrado")
+    if inscricoes_pendentes > 0:
+        raise OperacaoInvalidaError(
+            "nao e possivel encerrar evento com inscricoes pendentes"
+        )
+    self.status = StatusEvento.ENCERRADO
+```
+
+### 3. Refatoração
+
+As regras de transição e a validação de estado para alteração de lotes foram extraídas para a política interna `_CicloDeVidaEvento`. A entidade `Evento` delega essas decisões e continua expondo os mesmos métodos, atributos e coleção de lotes; o mapeamento ORM também permanece inalterado.
+
+O commit anterior de Felipe usado como referência é `e95754b`, no qual o código acima já estava presente. A extração foi registrada no commit `bfb9d1d`.
+
+### 4. Como os testes garantiram que o comportamento não mudou
+
+- Antes da refatoração, os testes focados de `Evento`, `LoteDeIngresso` e do repositório de eventos passaram: 23 testes.
+- Após a refatoração, os testes existentes continuaram exercitando transições válidas e inválidas, encerramento com inscrições pendentes, bloqueio de alteração de lotes e integração com persistência.
+- A suíte completa passou após a mudança: 111 testes.
+
+### 5. Custo da refatoração
+
+A mudança adiciona uma classe interna e uma camada de delegação entre `Evento` e as regras de ciclo de vida. Esse custo compensa porque as políticas de status ficam concentradas em um único lugar, enquanto `Evento` preserva sua interface e responsabilidade de coordenar o agregado e seu catálogo de lotes.
