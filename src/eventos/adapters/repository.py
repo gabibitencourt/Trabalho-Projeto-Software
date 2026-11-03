@@ -83,10 +83,15 @@ class AbstractInscricaoRepository(abc.ABC):
     def remover(self, identificador: int):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def commit(self):
+        raise NotImplementedError
+
 
 class FakeInscricaoRepository(AbstractInscricaoRepository):
     def __init__(self):
         self._inscricoes = {}
+        self.commitou = False
 
     def adicionar(self, inscricao: Inscricao):
         self._inscricoes[inscricao.identificador] = inscricao
@@ -106,6 +111,9 @@ class FakeInscricaoRepository(AbstractInscricaoRepository):
 
     def remover(self, identificador: int):
         self._inscricoes.pop(identificador, None)
+
+    def commit(self):
+        self.commitou = True
 
 
 class SqlAlchemyInscricaoRepository(AbstractInscricaoRepository):
@@ -133,6 +141,9 @@ class SqlAlchemyInscricaoRepository(AbstractInscricaoRepository):
         inscricao = self.obter(identificador)
         if inscricao:
             self.session.delete(inscricao)
+
+    def commit(self):
+        self.session.commit()
 
 
 class AbstractPagamentoRepository(abc.ABC):

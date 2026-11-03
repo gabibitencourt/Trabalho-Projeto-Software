@@ -23,6 +23,7 @@ def criar_inscricao(identificador, participante, lote, repositorio):
         lote=lote,
     )
     repositorio.adicionar(inscricao)
+    repositorio.commit()
     return inscricao
 
 
@@ -37,6 +38,7 @@ def confirmar_inscricao(identificador, repositorio):
     inscricao = obter_inscricao(identificador, repositorio)
     inscricao.confirmar()
     repositorio.atualizar(inscricao)
+    repositorio.commit()
     return inscricao
 
 
@@ -44,6 +46,7 @@ def cancelar_inscricao(identificador, repositorio):
     inscricao = obter_inscricao(identificador, repositorio)
     inscricao.cancelar()
     repositorio.atualizar(inscricao)
+    repositorio.commit()
     return inscricao
 
 
