@@ -159,3 +159,111 @@ O commit anterior de Felipe usado como referência é `e95754b`, no qual o códi
 ### 5. Custo da refatoração
 
 A mudança adiciona uma classe interna e uma camada de delegação entre `Evento` e as regras de ciclo de vida. Esse custo compensa porque as políticas de status ficam concentradas em um único lugar, enquanto `Evento` preserva sua interface e responsabilidade de coordenar o agregado e seu catálogo de lotes.
+
+---
+
+## Refatoração — Arthur Siqueira Campos Alexandrino (@devalexandrino)
+
+- **Agregado / Módulo:** Evento (`Evento` em `src/eventos/domain/model.py`)
+- **Princípio Violado:** OCP (Open/Closed Principle — Princípio Aberto/Fechado)
+- **Commit "antes":** `53a858b` (16/09/2026)
+- **Commit "depois":** `<hash-do-commit-da-refatoracao>`
+
+### 1. Problema
+
+No commit `53a858b` (anterior a 06/10/2026), o método `Evento.alterar_lote` apenas verificava se o evento estava no status `PLANEJADO`, localizava o lote pelo `identificador` e substituía diretamente a instância na coleção (`self._lotes[indice] = lote_atualizado`).
+
+Isso expunha uma violação do Princípio Aberto/Fechado (OCP) diante das regras de negócio que comparam o estado anterior do lote (`lote_atual`) com o novo (`lote_atualizado`):
+- A invariante prevista na especificação do agregado (`PROPOSTA.md`, seção 4.1: *"Não é possível reduzir a quantidade de um lote para um valor menor do que já foi vendido"*) não pode ser garantida isoladamente pelo construtor de `LoteDeIngresso` quando um novo objeto `LoteDeIngresso` (com `quant_vendida=0` por padrão) é passado para substituir um lote que já teve vendas registradas em `Evento`.
+- Além disso, evoluções plausíveis de requisitos para alteração de lotes (como proibir alteração de preço de um lote que já possui ingressos vendidos ou impedir renomeação de lotes ativos) obrigavam a abrir e modificar diretamente o método `Evento.alterar_lote` para encadear novos blocos `if ...: raise OperacaoInvalidaError(...)`.
+
+### 2. Trecho de Código Antes
+
+```python
+class Evento:
+	def __init__(self, identificador, nome, data, local, status):
+		self.identificador = identificador
+		self.nome = nome
+		self.data = data
+		self.local = local
+		self.status = status
+		self._lotes = []
+
+	def alterar_lote(self, identificador_lote, lote_atualizado):
+		self._exigir_evento_planejado()
+		for indice, lote in enumerate(self._lotes):
+			if lote.identificador == identificador_lote:
+				self._lotes[indice] = lote_atualizado
+				return
+		raise OperacaoInvalidaError("lote nao encontrado")
+```
+
+### 3. Refatoração
+
+Extraí o contrato abstrato `RegraAlteracaoLote` com o método `validar(lote_atual, lote_atualizado)` e implementei as regras concretas `RegraNaoReduzirCapacidadeAbaixoDoVendido` (ativa por padrão em `Evento`) e `RegraNaoAlterarPrecoComVendas`. A classe `Evento` passou a iterar sobre uma coleção imutável de regras (`self._regras_alteracao_lote`) antes de substituir o lote:
+
+```python
+class RegraAlteracaoLote(abc.ABC):
+	@abc.abstractmethod
+	def validar(self, lote_atual, lote_atualizado):
+		raise NotImplementedError
+
+
+class RegraNaoReduzirCapacidadeAbaixoDoVendido(RegraAlteracaoLote):
+	def validar(self, lote_atual, lote_atualizado):
+		if lote_atualizado.quant_total < lote_atual.quant_vendida:
+			raise OperacaoInvalidaError(
+				"nao e possivel reduzir a quantidade do lote abaixo da quantidade ja vendida"
+			)
+
+
+class RegraNaoAlterarPrecoComVendas(RegraAlteracaoLote):
+	def validar(self, lote_atual, lote_atualizado):
+		if lote_atual.quant_vendida > 0 and lote_atualizado.preco != lote_atual.preco:
+			raise OperacaoInvalidaError(
+				"nao e possivel alterar o preco de lote com ingressos ja vendidos"
+			)
+
+
+class Evento:
+	_regras_alteracao_lote = (RegraNaoReduzirCapacidadeAbaixoDoVendido(),)
+
+	def __init__(
+		self,
+		identificador,
+		nome,
+		data,
+		local,
+		status,
+		regras_alteracao_lote=None,
+	):
+		...
+		if regras_alteracao_lote is not None:
+			self._regras_alteracao_lote = tuple(regras_alteracao_lote)
+
+	def alterar_lote(self, identificador_lote, lote_atualizado):
+		_CicloDeVidaEvento.exigir_planejado(self.status)
+		for indice, lote in enumerate(self._lotes):
+			if lote.identificador == identificador_lote:
+				for regra in self._regras_alteracao_lote:
+					regra.validar(lote, lote_atualizado)
+				self._lotes[indice] = lote_atualizado
+				return
+		raise OperacaoInvalidaError("lote nao encontrado")
+```
+
+Com isso, `Evento.alterar_lote` fica **fechado para modificação** e **aberto para extensão**: novas políticas de validação de alteração de lote são adicionadas criando novas subclasses de `RegraAlteracaoLote`, sem editar `Evento`. A definição de `_regras_alteracao_lote` também como atributo de classe garante compatibilidade total com o mapeamento imperativo do SQLAlchemy (`map_imperatively`), que reconstrói instâncias do banco sem invocar `__init__`.
+
+### 4. Como os testes garantiram que o comportamento não mudou
+
+- Todos os testes pré-existentes de `Evento` (`tests/unit/test_evento.py`), serviços (`tests/unit/test_services_evento.py`), repositório SQLAlchemy (`tests/integration/test_repository_evento.py`) e rotas Flask (`tests/e2e/test_eventos_api.py`) continuaram passando sem alteração.
+- Foram adicionados 3 novos testes unitários em `tests/unit/test_evento.py`:
+  1. `test_nao_altera_lote_reduzindo_quantidade_abaixo_do_ja_vendido`: garante que a regra padrão bloqueia a redução de `quant_total` abaixo da `quant_vendida` do lote original;
+  2. `test_altera_lote_aceita_extensao_com_regra_de_bloqueio_de_preco_apos_venda`: verifica a composição com `RegraNaoAlterarPrecoComVendas`;
+  3. `test_altera_lote_permite_nova_regra_customizada_sem_modificar_evento`: demonstra a introdução de uma nova regra (`RegraNaoAlterarNomeDoLote`) estendendo `RegraAlteracaoLote` sem modificar `Evento`.
+- A suíte completa passou a contar com 114 testes passando (111 anteriores + 3 novos).
+
+### 5. Custo da refatoração
+
+- **Custo:** adição de uma classe abstrata (`RegraAlteracaoLote`), duas classes concretas de regra e uma camada de indireção na leitura do fluxo de `alterar_lote`, além de um parâmetro opcional no construtor de `Evento`.
+- **Por que compensa:** protege a invariante de capacidade vendida do agregado `Evento`, isola cada regra de negócio em uma classe coesa e testável de forma independente e permite adicionar ou combinar novas políticas de alteração de lotes sem tocar no código da entidade `Evento` nem no mapeamento ORM.

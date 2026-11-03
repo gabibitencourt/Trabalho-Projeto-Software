@@ -89,6 +89,20 @@ camada de serviço se evento e os testes pertinentes a camada de serviço. api d
 - **Justificativa de decisão de projeto:** Para criar eventos sem geração de IDs pelo banco, o serviço escolhe o maior identificador existente mais um. Para encerrar, consulta inscrições através do contrato listar_por_evento(identificador_evento), e conta os status pendentes. a implementação atual do repositório de inscrições ainda precisa fornecer esse contrato.
 - **Uso de IA Generativa:**
 usei para esclarecer conceitos de sobre a camada de serviço
+
+#### Checkpoint 1 (22/10/2026) - Arquitetura e ADR
+- **Arquivos sob minha responsabilidade:** `docs/arquitetura.md` (seção Requisitos arquiteturais), `docs/adr/001-validar-dados-dominio.md` (ADR-002) e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** `03374aa`
+- **O que implementei:** Redação da seção de Requisitos Arquiteturais (objetivos, restrições e cenários de atributos de qualidade: testabilidade, integridade das regras de negócio e modificabilidade) em `docs/arquitetura.md` e elaboração do ADR-002 sobre o desacoplamento do encerramento de evento em relação ao agregado de inscrição via camada de serviço.
+- **Justificativa de decisão de projeto:** Documentei a decisão tomada na Fase 1 de manter a invariante de encerramento em `Evento.encerrar(inscricoes_pendentes)` recebendo apenas o inteiro apurado pelo serviço, preservando a independência entre as raízes de agregado `Evento` e `Inscricao`.
+- **Uso de IA Generativa (conforme Seção 2):** Apoio na revisão textual e formatação das tabelas de cenários de qualidade em Markdown.
+
+#### Checkpoint 2 (03/11/2026) - Refatoração SOLID
+- **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py`, `tests/unit/test_evento.py`, `docs/solid.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** antes: `53a858b`; depois: `<hash-do-commit-da-refatoracao>`
+- **O que implementei:** Refatoração da classe `Evento` (método `alterar_lote`) para corrigir violação do OCP (Princípio Aberto/Fechado), extraindo a interface abstrata `RegraAlteracaoLote` e as implementações `RegraNaoReduzirCapacidadeAbaixoDoVendido` e `RegraNaoAlterarPrecoComVendas`. Adição de testes unitários em `tests/unit/test_evento.py` e documentação completa da refatoração em `docs/solid.md`.
+- **Justificativa de decisão de projeto:** Como regras de alteração de lote comparam o estado anterior (`lote_atual`) com o novo (`lote_atualizado`) — a exemplo da invariante de não reduzir a capacidade total abaixo da quantidade já vendida —, concentrar essas verificações diretamente em `Evento.alterar_lote` obrigaria a modificar a classe `Evento` a cada nova política de negócio. Com a abstração `RegraAlteracaoLote` e uma tupla padrão de regras no atributo de classe `_regras_alteracao_lote`, `Evento` fica fechado para modificação e aberto para extensão sem quebrar a reconstrução de objetos pelo mapeamento clássico do SQLAlchemy (`map_imperatively`).
+- **Uso de IA Generativa (conforme Seção 2):** Utilização de assistente de IA para análise do histórico do repositório, identificação da violação de OCP no agregado `Evento`, e estruturação da documentação em `docs/solid.md` e `DECISIONS.md`, com revisão e validação final.
 ---
 
 ### Felipe Gomes de Mello (@FelipeGMello)

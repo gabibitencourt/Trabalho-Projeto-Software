@@ -6,6 +6,9 @@ from eventos.domain.model import (
     Evento,
     LoteDeIngresso,
     OperacaoInvalidaError,
+    RegraAlteracaoLote,
+    RegraNaoAlterarPrecoComVendas,
+    RegraNaoReduzirCapacidadeAbaixoDoVendido,
     StatusEvento,
 )
 
@@ -15,13 +18,14 @@ class LoteFake(LoteDeIngresso):
         super().__init__(identificador, "Lote Teste", 100.0, 100)
 
 
-def criar_evento(status=StatusEvento.PLANEJADO):
+def criar_evento(status=StatusEvento.PLANEJADO, regras_alteracao_lote=None):
     return Evento(
         identificador=1,
         nome="Conferencia de Software",
         data=date(2026, 10, 20),
         local="Niteroi",
         status=status,
+        regras_alteracao_lote=regras_alteracao_lote,
     )
 
 
@@ -87,6 +91,55 @@ def test_nao_altera_lote_inexistente():
         evento.alterar_lote(2, LoteFake(2))
 
     assert evento.lotes == (lote,)
+
+
+def test_nao_altera_lote_reduzindo_quantidade_abaixo_do_ja_vendido():
+    evento = criar_evento()
+    lote_com_vendas = LoteDeIngresso(1, "1o Lote", 100.0, quant_total=50, quant_vendida=20)
+    evento.adicionar_lote(lote_com_vendas)
+    lote_reduzido = LoteDeIngresso(1, "1o Lote", 100.0, quant_total=15, quant_vendida=0)
+
+    with pytest.raises(
+        OperacaoInvalidaError,
+        match="abaixo da quantidade ja vendida",
+    ):
+        evento.alterar_lote(1, lote_reduzido)
+
+    assert evento.lotes == (lote_com_vendas,)
+
+
+def test_altera_lote_aceita_extensao_com_regra_de_bloqueio_de_preco_apos_venda():
+    evento = criar_evento(
+        regras_alteracao_lote=(
+            RegraNaoReduzirCapacidadeAbaixoDoVendido(),
+            RegraNaoAlterarPrecoComVendas(),
+        )
+    )
+    lote_com_vendas = LoteDeIngresso(1, "1o Lote", 100.0, quant_total=50, quant_vendida=5)
+    evento.adicionar_lote(lote_com_vendas)
+    lote_preco_alterado = LoteDeIngresso(1, "1o Lote", 150.0, quant_total=50, quant_vendida=5)
+
+    with pytest.raises(
+        OperacaoInvalidaError,
+        match="alterar o preco de lote com ingressos ja vendidos",
+    ):
+        evento.alterar_lote(1, lote_preco_alterado)
+
+    assert evento.lotes == (lote_com_vendas,)
+
+
+def test_altera_lote_permite_nova_regra_customizada_sem_modificar_evento():
+    class RegraNaoAlterarNomeDoLote(RegraAlteracaoLote):
+        def validar(self, lote_atual, lote_atualizado):
+            if lote_atualizado.nome != lote_atual.nome:
+                raise OperacaoInvalidaError("nao e permitido renomear lote existente")
+
+    evento = criar_evento(regras_alteracao_lote=(RegraNaoAlterarNomeDoLote(),))
+    lote_original = LoteDeIngresso(1, "Lote Promocional", 80.0, quant_total=30)
+    evento.adicionar_lote(lote_original)
+
+    with pytest.raises(OperacaoInvalidaError, match="nao e permitido renomear lote"):
+        evento.alterar_lote(1, LoteDeIngresso(1, "Outro Nome", 80.0, quant_total=30))
 
 
 def test_nao_adiciona_lote_quando_evento_esta_encerrado():
@@ -157,5 +210,3 @@ def test_nao_inicia_evento_encerrado():
 
     with pytest.raises(OperacaoInvalidaError):
         evento.iniciar()
-
-

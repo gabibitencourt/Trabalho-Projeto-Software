@@ -1,3 +1,4 @@
+import abc
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
@@ -63,14 +64,48 @@ class _CicloDeVidaEvento:
 		return StatusEvento.ENCERRADO
 
 
+class RegraAlteracaoLote(abc.ABC):
+	@abc.abstractmethod
+	def validar(self, lote_atual, lote_atualizado):
+		raise NotImplementedError
+
+
+class RegraNaoReduzirCapacidadeAbaixoDoVendido(RegraAlteracaoLote):
+	def validar(self, lote_atual, lote_atualizado):
+		if lote_atualizado.quant_total < lote_atual.quant_vendida:
+			raise OperacaoInvalidaError(
+				"nao e possivel reduzir a quantidade do lote abaixo da quantidade ja vendida"
+			)
+
+
+class RegraNaoAlterarPrecoComVendas(RegraAlteracaoLote):
+	def validar(self, lote_atual, lote_atualizado):
+		if lote_atual.quant_vendida > 0 and lote_atualizado.preco != lote_atual.preco:
+			raise OperacaoInvalidaError(
+				"nao e possivel alterar o preco de lote com ingressos ja vendidos"
+			)
+
+
 class Evento:
-	def __init__(self, identificador, nome, data, local, status):
+	_regras_alteracao_lote = (RegraNaoReduzirCapacidadeAbaixoDoVendido(),)
+
+	def __init__(
+		self,
+		identificador,
+		nome,
+		data,
+		local,
+		status,
+		regras_alteracao_lote=None,
+	):
 		self.identificador = identificador
 		self.nome = nome
 		self.data = data
 		self.local = local
 		self.status = status
 		self._lotes = []
+		if regras_alteracao_lote is not None:
+			self._regras_alteracao_lote = tuple(regras_alteracao_lote)
 
 	@property
 	def lotes(self):
@@ -84,6 +119,8 @@ class Evento:
 		_CicloDeVidaEvento.exigir_planejado(self.status)
 		for indice, lote in enumerate(self._lotes):
 			if lote.identificador == identificador_lote:
+				for regra in self._regras_alteracao_lote:
+					regra.validar(lote, lote_atualizado)
 				self._lotes[indice] = lote_atualizado
 				return
 		raise OperacaoInvalidaError("lote nao encontrado")
