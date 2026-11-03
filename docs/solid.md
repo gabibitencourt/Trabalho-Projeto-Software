@@ -43,7 +43,7 @@ Realizei a extração das responsabilidades de validação para os Value Objects
 - **Agregado / Módulo:** Inscrição (camada de serviço e entrypoint Flask)
 - **Princípio Violado:** DIP (Dependency Inversion Principle — Princípio da Inversão de Dependência)
 - **Commit "antes":** `e3fc05d` (28/09/2026)
-- **Commit "depois":** `COLOCAR_HASH_AQUI`
+- **Commit "depois":** `9e5a6d8`
 
 ### 1. Problema
 Os casos de uso de inscrição (`criar_inscricao`, `confirmar_inscricao` e `cancelar_inscricao`) não confirmavam a transação. Quem fazia isso era a rota Flask, chamando `session.commit()` direto na sessão do SQLAlchemy. Ou seja, uma regra da aplicação ("ao final do caso de uso, salvar") dependia de um detalhe concreto de infraestrutura e estava no lugar errado.

@@ -206,3 +206,17 @@ Nenhuma.
 - **O que implementei:** Casos de uso de criar, consultar, confirmar e cancelar inscrição. Criei endpoints Flask correspondentes (POST /inscricoes, GET /inscricoes/<id>, POST /inscricoes/<id>/confirmar e POST /inscricoes/<id>/cancelar) e testes e2e que validam a criação, consulta, confirmação, cancelamento e o retorno 404 para inscrição inexistente.
 - **Justificativa de decisão de projeto:** Os fluxos foram concentrados na camada de serviço, que coordena o agregado e o repositório; o endpoint apenas interpreta a requisição, confirma a transação e serializa a resposta. A aplicação recebe uma sessão opcional para permitir testes e2e com SQLite em memória.
 - **Uso de IA Generativa:**
+
+#### Checkpoint 1 (22/10/2026) - Arquitetura e ADR-004
+- **Arquivos sob minha responsabilidade:** `docs/arquitetura.md` (seção Alternativa) e `docs/adr/004-unit-of-work-e-message-bus.md`.
+- **Intervalo/Hashes de Commits:** 6ead0be
+- **O que implementei:** Seção de Alternativa do documento de arquitetura, comparando a arquitetura atual com Unit of Work + Message Bus com eventos de domínio, e descartando Active Record. Escrevi o ADR-004, que propõe mover o commit das rotas Flask para a camada de serviço com uma Unit of Work e, em seguida, introduzir eventos de domínio e o Message Bus.
+- **Justificativa de decisão de projeto:** A Unit of Work vem antes do Message Bus porque resolve primeiro a lacuna transacional (commit nas rotas e inscrição criada sem consumir vaga do lote); introduzir o Message Bus antes adicionaria indireção sem resolver esse problema.
+- **Uso de IA Generativa (conforme Seção 2.5):**
+
+#### Checkpoint 2 (03/11/2026) - Refatoração SOLID
+- **Arquivos sob minha responsabilidade:** `src/eventos/adapters/repository.py`, `src/eventos/service_layer/services.py`, `src/eventos/entrypoints/flask_app.py`, `tests/unit/test_services_inscricao.py` e `docs/solid.md`.
+- **Intervalo/Hashes de Commits:** antes: e3fc05d; depois: 9e5a6d8
+- **O que implementei:** Correção de uma violação do DIP (Princípio da Inversão de Dependência) nos casos de uso de inscrição. O commit da transação estava nas rotas Flask, chamando `session.commit()` direto no SQLAlchemy. Adicionei `commit()` em `AbstractInscricaoRepository` (implementado no repositório SQLAlchemy e no Fake), e `criar_inscricao`, `confirmar_inscricao` e `cancelar_inscricao` passaram a chamar `repositorio.commit()`. Criei testes unitários que verificam o commit usando o `FakeInscricaoRepository`.
+- **Justificativa de decisão de projeto:** O caso de uso passa a depender só da abstração do repositório, e não da `Session` do SQLAlchemy, e fica completo sem depender da rota lembrar de salvar. Coloquei o `commit()` no repositório em vez de criar uma Unit of Work para manter a mudança pequena e restrita ao meu módulo; a Unit of Work completa continua proposta no ADR-004.
+- **Uso de IA Generativa (conforme Seção 2.5):** Apoio na identificação da violação e na implementação; revisão e decisão final do autor.
