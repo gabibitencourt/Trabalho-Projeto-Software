@@ -31,6 +31,38 @@ class OperacaoInvalidaError(Exception):
 class CheckIn:
     data_hora: datetime
 
+
+class _CicloDeVidaEvento:
+	@staticmethod
+	def exigir_planejado(status):
+		if status is not StatusEvento.PLANEJADO:
+			raise OperacaoInvalidaError(
+				"nao e possivel alterar lotes de evento em andamento ou encerrado"
+			)
+
+	@staticmethod
+	def iniciar(status):
+		if status is StatusEvento.EM_ANDAMENTO:
+			raise OperacaoInvalidaError("evento ja esta em andamento")
+		if status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		return StatusEvento.EM_ANDAMENTO
+
+	@staticmethod
+	def encerrar(status, inscricoes_pendentes):
+		if inscricoes_pendentes < 0:
+			raise ValueError(
+				"a quantidade de inscricoes pendentes nao pode ser negativa"
+			)
+		if status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError("evento ja esta encerrado")
+		if inscricoes_pendentes > 0:
+			raise OperacaoInvalidaError(
+				"nao e possivel encerrar evento com inscricoes pendentes"
+			)
+		return StatusEvento.ENCERRADO
+
+
 class Evento:
 	def __init__(self, identificador, nome, data, local, status):
 		self.identificador = identificador
@@ -45,40 +77,24 @@ class Evento:
 		return tuple(self._lotes)
 
 	def adicionar_lote(self, lote):
-		self._exigir_evento_planejado()
+		_CicloDeVidaEvento.exigir_planejado(self.status)
 		self._lotes.append(lote)
 
 	def alterar_lote(self, identificador_lote, lote_atualizado):
-		self._exigir_evento_planejado()
+		_CicloDeVidaEvento.exigir_planejado(self.status)
 		for indice, lote in enumerate(self._lotes):
 			if lote.identificador == identificador_lote:
 				self._lotes[indice] = lote_atualizado
 				return
 		raise OperacaoInvalidaError("lote nao encontrado")
 
-	def _exigir_evento_planejado(self):
-		if self.status is not StatusEvento.PLANEJADO:
-			raise OperacaoInvalidaError(
-				"nao e possivel alterar lotes de evento em andamento ou encerrado"
-			)
-
 	def iniciar(self):
-		if self.status is StatusEvento.EM_ANDAMENTO:
-			raise OperacaoInvalidaError("evento ja esta em andamento")
-		if self.status is StatusEvento.ENCERRADO:
-			raise OperacaoInvalidaError("evento ja esta encerrado")
-		self.status = StatusEvento.EM_ANDAMENTO
+		self.status = _CicloDeVidaEvento.iniciar(self.status)
 
 	def encerrar(self, inscricoes_pendentes):
-		if inscricoes_pendentes < 0:
-			raise ValueError("a quantidade de inscricoes pendentes nao pode ser negativa")
-		if self.status is StatusEvento.ENCERRADO:
-			raise OperacaoInvalidaError("evento ja esta encerrado")
-		if inscricoes_pendentes > 0:
-			raise OperacaoInvalidaError(
-				"nao e possivel encerrar evento com inscricoes pendentes"
-			)
-		self.status = StatusEvento.ENCERRADO
+		self.status = _CicloDeVidaEvento.encerrar(
+			self.status, inscricoes_pendentes
+		)
 
 class Inscricao:
     def __init__(self, identificador, participante, lote):
