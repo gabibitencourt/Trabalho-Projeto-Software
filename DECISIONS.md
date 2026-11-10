@@ -45,6 +45,13 @@ Este documento registra as contribuições individuais e as decisões de projeto
 - **Justificativa de decisão de projeto:** O isolamento das regras de validação em Value Objects impede que a entidade `Participante` precise ser alterada caso novas regras de formatação de documentos ou e-mails sejam adotadas.
 - **Uso de IA Generativa:** Utilização de assistente de IA para suporte na estruturação da refatoração em Python preservando compatibilidade com o ORM.
 
+#### Checkpoint 3 (10/11/2026) - Padrões GoF
+- **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py`, `tests/unit/test_participante.py`, `docs/gof.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** 30fb7aecbade87e238757787478c591db68e8e35, 73fba291cd73ecdbcff33ead7504411853698382
+- **O que implementei:** Aplicação do padrão GoF estrutural **Decorator** na entidade `Participante` para permitir dinamismo na concessão de descontos e tipos de credenciais (VIP, Meia-Entrada/Estudante). Adição da suíte de testes unitários e elaboração da documentação técnica no `docs/gof.md`.
+- **Justificativa de decisão de projeto:** O Decorator evita a inflação de atributos booleanos na classe `Participante` e a explosão de subclasses, permitindo empilhar dinamicamente privilégios em tempo de execução sem impactar o esquema de persistência relacional.
+- **Uso de IA Generativa:** Suporte na modelagem das interfaces do Decorator e na documentação técnica.
+
 ---
 
 ### Arthur Siqueira Campos Alexandrino (@devalexandrino)
