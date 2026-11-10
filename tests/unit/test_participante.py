@@ -1,5 +1,5 @@
 import pytest
-from eventos.domain.model import Participante, Documento, Email
+from eventos.domain.model import Participante, Documento, Email, ParticipanteEstudanteDecorator, ParticipanteVIPDecorator
 
 def criar_participante():
     return Participante(
@@ -57,3 +57,37 @@ def test_value_object_documento_valido_e_sanitizado():
 def test_value_object_documento_invalido_dispara_erro():
     with pytest.raises(ValueError, match="documento invalido"):
         Documento("123")
+
+def test_gof_decorator_participante_padrao_sem_desconto():
+    p = Participante(1, "Gabriela", "gabi@email.com", "12345678900")
+    assert p.obter_desconto_ingresso() == 0.0
+    assert p.obter_tipo_credencial() == "PADRÃO"
+
+def test_gof_decorator_participante_vip():
+    p_base = Participante(1, "Gabriela Bitencourt", "gabi@email.com", "12345678900")
+    p_vip = ParticipanteVIPDecorator(p_base)
+
+    assert p_vip.nome == "Gabriela Bitencourt"
+    assert p_vip.obter_desconto_ingresso() == 0.20
+    assert "VIP" in p_vip.obter_tipo_credencial()
+
+def test_gof_decorator_participante_estudante_meia_entrada():
+    p_base = Participante(1, "Gabriela", "gabi@email.com", "12345678900")
+    p_estudante = ParticipanteEstudanteDecorator(p_base, matricula_estudante="2026100123")
+
+    assert p_estudante.obter_desconto_ingresso() == 0.50
+    assert "ESTUDANTE" in p_estudante.obter_tipo_credencial()
+
+def test_gof_decorator_estudante_sem_matricula_dispara_erro():
+    p_base = Participante(1, "Gabriela", "gabi@email.com", "12345678900")
+    with pytest.raises(ValueError, match="matricula de estudante obrigatoria"):
+        ParticipanteEstudanteDecorator(p_base, matricula_estudante="")
+
+def test_gof_decorator_combina_vip_e_estudante():
+    p_base = Participante(1, "Gabriela", "gabi@email.com", "12345678900")
+    p_vip = ParticipanteVIPDecorator(p_base)
+    p_combo = ParticipanteEstudanteDecorator(p_vip, matricula_estudante="2026100123")
+
+    assert p_combo.obter_desconto_ingresso() == 0.50
+    assert "VIP" in p_combo.obter_tipo_credencial()
+    assert "ESTUDANTE" in p_combo.obter_tipo_credencial()

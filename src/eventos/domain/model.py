@@ -227,8 +227,19 @@ class Email:
     def __eq__(self, outro):
         return isinstance(outro, Email) and self.valor == outro.valor
 
+class AbstractParticipante(abc.ABC):
+    """Component (Interface Abstrata) do padrão Decorator."""
+    @abc.abstractmethod
+    def obter_desconto_ingresso(self) -> float:
+        """Retorna o percentual de desconto aplicado ao ingresso (0.0 a 1.0)."""
+        pass
 
-class Participante:
+    @abc.abstractmethod
+    def obter_tipo_credencial(self) -> str:
+        """Retorna a descrição impressa no crachá/credencial."""
+        pass
+
+class Participante(AbstractParticipante):
     def __init__(self, identificador, nome, email, documento):
         if not nome or not nome.strip():
             raise ValueError("nome obrigatorio")
@@ -242,7 +253,67 @@ class Participante:
 
     def alterar_email(self, novo_email):
         self.email = novo_email.valor if isinstance(novo_email, Email) else Email(novo_email).valor
-        
+
+    def obter_desconto_ingresso(self) -> float:
+        return 0.0  # Participante padrão paga valor integral
+
+    def obter_tipo_credencial(self) -> str:
+        return "PADRÃO"
+
+class ParticipanteDecorator(AbstractParticipante):
+    """Base Decorator: Envolve um AbstractParticipante delegando chamadas padrão."""
+    def __init__(self, participante: AbstractParticipante):
+        self._participante = participante
+
+    @property
+    def identificador(self):
+        return getattr(self._participante, "identificador", None)
+
+    @property
+    def nome(self) -> str:
+        return getattr(self._participante, "nome", "")
+
+    @property
+    def email(self) -> str:
+        return getattr(self._participante, "email", "")
+
+    @property
+    def documento(self) -> str:
+        return getattr(self._participante, "documento", "")
+
+    def obter_desconto_ingresso(self) -> float:
+        return self._participante.obter_desconto_ingresso()
+
+    def obter_tipo_credencial(self) -> str:
+        return self._participante.obter_tipo_credencial()
+
+
+class ParticipanteVIPDecorator(ParticipanteDecorator):
+    """Concrete Decorator: Concede acesso ao Lounge VIP e 20% de desconto."""
+    def obter_desconto_ingresso(self) -> float:
+        desconto_atual = super().obter_desconto_ingresso()
+        return max(desconto_atual, 0.20)
+
+    def obter_tipo_credencial(self) -> str:
+        base = super().obter_tipo_credencial()
+        return f"{base} | VIP (Acesso ao Lounge)"
+
+class ParticipanteEstudanteDecorator(ParticipanteDecorator):
+    """Concrete Decorator: Valida matricula e garante 50% de desconto (meia-entrada)."""
+    def __init__(self, participante: AbstractParticipante, matricula_estudante: str):
+        super().__init__(participante)
+        if not matricula_estudante or not matricula_estudante.strip():
+            raise ValueError("matricula de estudante obrigatoria")
+        self.matricula_estudante = matricula_estudante.strip()
+
+    def obter_desconto_ingresso(self) -> float:
+        desconto_atual = super().obter_desconto_ingresso()
+        return max(desconto_atual, 0.50)
+
+    def obter_tipo_credencial(self) -> str:
+        base = super().obter_tipo_credencial()
+        return f"{base} | ESTUDANTE (Meia-Entrada)"
+    
 class Organizador:
 
     def __init__(
