@@ -1,4 +1,8 @@
-from eventos.domain.model import LoteDeIngresso
+from eventos.domain.model import (
+    DescontoPercentual,
+    LoteDeIngresso,
+    PrecoIntegral,
+)
 import pytest
     
 def teste_caminho_feliz(): # Caminho feliz
@@ -19,3 +23,15 @@ def teste_valores_negativos(): # Erro do usuário ou de outra função, valores 
 def teste_quant_vendido_invalida(): # Consigo criar um evento que vendeu mais do que tinha pra vender?
     with pytest.raises(Exception): 
         LoteDeIngresso(1, "Queiroz", 40, 20, 50)
+
+
+def teste_lote_calcula_preco_com_estrategias_diferentes():
+    lote = LoteDeIngresso(1, "Promocional", 100, 20)
+
+    assert lote.calcular_preco(PrecoIntegral()) == 100
+    assert lote.calcular_preco(DescontoPercentual(25)) == 75
+
+
+def teste_desconto_percentual_invalido():
+    with pytest.raises(ValueError):
+        DescontoPercentual(101)

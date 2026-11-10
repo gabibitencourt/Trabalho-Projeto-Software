@@ -262,6 +262,27 @@ class Organizador:
         self.email = email.lower().strip()
         self.role = role
 
+class EstrategiaPreco(abc.ABC):
+    @abc.abstractmethod
+    def calcular(self, preco_base):
+        raise NotImplementedError
+
+
+class PrecoIntegral(EstrategiaPreco):
+    def calcular(self, preco_base):
+        return preco_base
+
+
+class DescontoPercentual(EstrategiaPreco):
+    def __init__(self, percentual):
+        if not 0 <= percentual <= 100:
+            raise ValueError("percentual de desconto deve estar entre 0 e 100")
+        self.percentual = percentual
+
+    def calcular(self, preco_base):
+        return preco_base * (1 - self.percentual / 100)
+
+
 class LoteDeIngresso:
     def __init__(self, identificador, nome, preco, quant_total, quant_vendida=0):
         if quant_total < 0 or quant_vendida < 0 or preco < 0:
@@ -274,6 +295,9 @@ class LoteDeIngresso:
         self.preco = preco
         self.quant_total = quant_total
         self.quant_vendida = quant_vendida
+
+    def calcular_preco(self, estrategia):
+        return estrategia.calcular(self.preco)
 
     def __str__(self):
             return f"nome: {self.nome}\npreco: {self.preco}\nquantidade total: {self.quant_total}\nquantidade vendida: {self.quant_vendida}"
