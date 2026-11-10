@@ -88,3 +88,91 @@ as políticas variam ou novas regras são adicionadas com frequência. Nesse cas
 a regra nova fica isolada e não aumenta os condicionais nem altera
 `LoteDeIngresso`. As estratégias não precisam ser persistidas, então não há
 custo de migração do esquema do banco de dados.
+
+
+# Padrão GoF: Decorator
+
+- **Categoria:** Estrutural
+- **Agregado:** `Inscrição` (`Participante`)
+- **Autora:** Gabriela Bitencourt Freire da Silva (@gabibitencourt)
+
+## Contexto e problema
+
+O sistema precisava conceder benefícios e tratamentos diferenciados (como descontos no valor do ingresso e identificação em credenciais/crachás) para categorias especiais de participantes (ex: VIP, Meia-Entrada / Estudante).
+
+Adicionar múltiplos campos booleanos (`is_vip`, `is_estudante`) na classe `Participante` violaria o Princípio da Responsabilidade Única (SRP) e inflaria a entidade. Por outro lado, criar subclasses estáticas para cada combinação possível geraria uma explosão de classes (`ParticipanteVIPEstudante`, `ParticipanteVIP`, etc.).
+
+## Por que Decorator
+
+O padrão **Decorator** permite adicionar responsabilidades e comportamentos adicionais a um objeto individual dinamicamente em tempo de execução, sem afetar outros objetos da mesma classe e sem modificar o código-fonte da entidade `Participante`.
+
+Como alternativa, considerei a Herança Múltipla ou Subclasses Estáticas. No entanto, essa abordagem acoplaria as regras em tempo de compilação e tornaria inviável a combinação dinâmica e flexível de múltiplos privilégios sobre um mesmo participante.
+
+## Participantes
+
+| Papel no padrão | Classe/método no sistema |
+|---|---|
+| Component (Interface) | `AbstractParticipante`, contrato abstrato com as propriedades e métodos `obter_desconto_ingresso` e `obter_tipo_credencial` |
+| Concrete Component | `Participante`, entidade base que retorna o valor integral (0% desconto) e credencial "PADRÃO" |
+| Decorator Base | `ParticipanteDecorator`, classe base abstrata que envolve uma instância de `AbstractParticipante` e delega as chamadas |
+| Concrete Decorator | `ParticipanteVIPDecorator`, estende a credencial com acesso ao Lounge e garante 20% de desconto |
+| Concrete Decorator | `ParticipanteEstudanteDecorator`, valida a matrícula do estudante, estende a credencial e garante 50% de desconto (meia-entrada) |
+
+## Diagrama de classes
+
+```mermaid
+classDiagram
+    class AbstractParticipante {
+        <<interface>>
+        +nome: str
+        +email: str
+        +documento: str
+        +obter_desconto_ingresso() float*
+        +obter_tipo_credencial() str*
+    }
+    class Participante {
+        +identificador: int
+        +nome: str
+        +email: str
+        +documento: str
+        +obter_desconto_ingresso() float
+        +obter_tipo_credencial() str
+    }
+    class ParticipanteDecorator {
+        -_participante: AbstractParticipante
+        +obter_desconto_ingresso() float
+        +obter_tipo_credencial() str
+    }
+    class ParticipanteVIPDecorator {
+        +obter_desconto_ingresso() float
+        +obter_tipo_credencial() str
+    }
+    class ParticipanteEstudanteDecorator {
+        +matricula_estudante: str
+        +obter_desconto_ingresso() float
+        +obter_tipo_credencial() str
+    }
+
+    AbstractParticipante <|.. Participante
+    AbstractParticipante <|.. ParticipanteDecorator
+    ParticipanteDecorator o-- AbstractParticipante : envolve
+    ParticipanteDecorator <|-- ParticipanteVIPDecorator
+    ParticipanteDecorator <|-- ParticipanteEstudanteDecorator
+```
+
+## Teste
+
+Os testes unitários em `tests/unit/test_participante.py` exercitam:
+
+`test_gof_decorator_participante_padrao_sem_desconto`: comportamento baseline.
+
+`test_gof_decorator_participante_vip`: benefícios isolados de VIP.
+
+`test_gof_decorator_participante_estudante_meia_entrada`: validação de matrícula e meia-entrada.
+
+`test_gof_decorator_combina_vip_e_estudante`: empilhamento dinâmico de múltiplos decorators sobre a mesma instância.
+
+## Custo da aplicação
+O custo principal foi a introdução da interface abstrata `AbstractParticipante`, da classe base `ParticipanteDecorator` e das subclasses de decoradores concretos, além de pequenas indireções no acesso aos atributos.
+
+Em contrapartida, o benefício é a capacidade de combinar privilégios livremente em tempo de execução sem alterar o modelo de dados nem modificar o schema do banco relacional.
