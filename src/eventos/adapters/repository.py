@@ -167,10 +167,15 @@ class AbstractPagamentoRepository(abc.ABC):
     def remover(self, identificador: int):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def commit(self):
+        raise NotImplementedError
+
 
 class FakePagamentoRepository(AbstractPagamentoRepository):
     def __init__(self):
         self._pagamentos = set()
+        self.commitou = False
 
     def adicionar(self, pagamento: Pagamento):
         self._pagamentos.add(pagamento)
@@ -193,6 +198,9 @@ class FakePagamentoRepository(AbstractPagamentoRepository):
         if pagamento:
             self._pagamentos.remove(pagamento)
 
+    def commit(self):
+        self.commitou = True
+
 
 class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
     def __init__(self, session: Session):
@@ -214,6 +222,9 @@ class SqlAlchemyPagamentoRepository(AbstractPagamentoRepository):
         pagamento = self.obter(identificador)
         if pagamento:
             self.session.delete(pagamento)
+
+    def commit(self):
+        self.session.commit()
 
 class AbstractLoteDeIngressoRepository(abc.ABC):
     @abc.abstractmethod

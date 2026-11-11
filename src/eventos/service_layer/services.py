@@ -102,6 +102,7 @@ def registrar_pagamento(
         valor=valor,
     )
     repositorio_pagamento.adicionar(pagamento)
+    repositorio_pagamento.commit()
     return pagamento
 
 
@@ -116,6 +117,7 @@ def aprovar_pagamento(identificador: int, repositorio_pagamento):
     pagamento = obter_pagamento(identificador, repositorio_pagamento)
     pagamento.aprovar()
     repositorio_pagamento.atualizar(pagamento)
+    repositorio_pagamento.commit()
     return pagamento
 
 
@@ -123,6 +125,7 @@ def recusar_pagamento(identificador: int, repositorio_pagamento):
     pagamento = obter_pagamento(identificador, repositorio_pagamento)
     pagamento.recusar()
     repositorio_pagamento.atualizar(pagamento)
+    repositorio_pagamento.commit()
     return pagamento
 
 
@@ -130,6 +133,7 @@ def estornar_pagamento(identificador: int, repositorio_pagamento):
     pagamento = obter_pagamento(identificador, repositorio_pagamento)
     pagamento.estornar()
     repositorio_pagamento.atualizar(pagamento)
+    repositorio_pagamento.commit()
     return pagamento
 
 
@@ -146,6 +150,7 @@ def confirmar_inscricao_apos_pagamento(
 
     pagamento.inscricao.confirmar()
     repositorio_inscricao.atualizar(pagamento.inscricao)
+    repositorio_inscricao.commit()
     return pagamento.inscricao
 
 def realizar_checkin(identificador: int, repositorio_inscricao):

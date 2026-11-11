@@ -185,7 +185,6 @@ def create_app(session=None):
         except KeyError as error:
             raise ValueError(f"campo obrigatorio: {error.args[0]}") from error
 
-        session.commit()
         return jsonify(_serializar_pagamento(pagamento)), 201
 
     @app.get("/pagamentos/<int:identificador>")
@@ -196,19 +195,16 @@ def create_app(session=None):
     @app.post("/pagamentos/<int:identificador>/aprovar")
     def aprovar_pagamento(identificador):
         pagamento = services.aprovar_pagamento(identificador, repositorio_pagamento)
-        session.commit()
         return jsonify(_serializar_pagamento(pagamento))
 
     @app.post("/pagamentos/<int:identificador>/recusar")
     def recusar_pagamento(identificador):
         pagamento = services.recusar_pagamento(identificador, repositorio_pagamento)
-        session.commit()
         return jsonify(_serializar_pagamento(pagamento))
 
     @app.post("/pagamentos/<int:identificador>/estornar")
     def estornar_pagamento(identificador):
         pagamento = services.estornar_pagamento(identificador, repositorio_pagamento)
-        session.commit()
         return jsonify(_serializar_pagamento(pagamento))
 
     @app.post("/pagamentos/<int:identificador>/confirmar-inscricao")
@@ -218,8 +214,7 @@ def create_app(session=None):
             repositorio_pagamento=repositorio_pagamento,
             repositorio_inscricao=repository,
         )
-        session.commit()
-        return jsonify(_serializar_inscricao(inscricao))    
+        return jsonify(_serializar_inscricao(inscricao))
 
     @app.post("/inscricoes/<int:identificador>/checkin")
     def realizar_checkin(identificador):

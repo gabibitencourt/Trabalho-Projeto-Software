@@ -35,6 +35,7 @@ def test_registrar_pagamento_salva_no_repositorio():
     assert pagamento.valor == 150.0
     assert pagamento.inscricao == inscricao
     assert repositorio_pagamento.obter(100) is pagamento
+    assert repositorio_pagamento.commitou is True
 
 
 def test_registrar_pagamento_falha_se_inscricao_nao_existir():
@@ -57,6 +58,8 @@ def test_aprovar_pagamento_muda_status_e_atualiza_repositorio():
     pagamento = Pagamento(identificador=100, inscricao=inscricao, valor=150.0)
     repositorio_pagamento.adicionar(pagamento)
 
+    repositorio_pagamento.commitou = False
+
     pagamento_aprovado = services.aprovar_pagamento(
         identificador=100,
         repositorio_pagamento=repositorio_pagamento,
@@ -64,6 +67,7 @@ def test_aprovar_pagamento_muda_status_e_atualiza_repositorio():
 
     assert pagamento_aprovado.status == StatusPagamento.APROVADO
     assert repositorio_pagamento.obter(100).status == StatusPagamento.APROVADO
+    assert repositorio_pagamento.commitou is True
 
 
 def test_obter_pagamento_inexistente_gera_erro():
@@ -78,10 +82,26 @@ def test_recusar_pagamento_muda_status():
     pagamento = Pagamento(identificador=100, inscricao=criar_inscricao_teste(), valor=150.0)
     repositorio_pagamento.adicionar(pagamento)
 
+    repositorio_pagamento.commitou = False
+
     pagamento_recusado = services.recusar_pagamento(100, repositorio_pagamento)
 
     assert pagamento_recusado.status is StatusPagamento.RECUSADO
     assert repositorio_pagamento.obter(100).status is StatusPagamento.RECUSADO
+    assert repositorio_pagamento.commitou is True
+
+
+def test_estornar_pagamento_aprovado_faz_commit():
+    repositorio_pagamento = FakePagamentoRepository()
+    pagamento = Pagamento(identificador=100, inscricao=criar_inscricao_teste(), valor=150.0)
+    pagamento.aprovar()
+    repositorio_pagamento.adicionar(pagamento)
+    repositorio_pagamento.commitou = False
+
+    pagamento_estornado = services.estornar_pagamento(100, repositorio_pagamento)
+
+    assert pagamento_estornado.status is StatusPagamento.ESTORNADO
+    assert repositorio_pagamento.commitou is True
 
 
 def test_estornar_pagamento_bloqueado_apos_checkin():
@@ -107,6 +127,8 @@ def test_confirmar_inscricao_apos_pagamento_aprovado():
     pagamento.aprovar()
     repositorio_pagamento.adicionar(pagamento)
 
+    repositorio_inscricao.commitou = False
+
     services.confirmar_inscricao_apos_pagamento(
         identificador=100,
         repositorio_pagamento=repositorio_pagamento,
@@ -114,6 +136,7 @@ def test_confirmar_inscricao_apos_pagamento_aprovado():
     )
 
     assert repositorio_inscricao.obter(1).status is StatusInscricao.CONFIRMADA
+    assert repositorio_inscricao.commitou is True
 
 
 def test_nao_confirma_inscricao_com_pagamento_pendente():
