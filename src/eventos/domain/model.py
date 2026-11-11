@@ -1,4 +1,5 @@
 import abc
+from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
@@ -248,26 +249,91 @@ _ESTADOS_POR_STATUS: dict[StatusPagamento, EstadoPagamento] = {
 	StatusPagamento.ESTORNADO: _EstadoEstornado(),
 }
 
+class ObservadorPagamento(ABC):
+    @abstractmethod
+    def atualizar(self, pagamento: "Pagamento", evento: str) -> None:
+        """Notifica o observador sobre um evento de ciclo de vida do pagamento."""
+        pass
+
+
+class InscricaoSyncObserver(ObservadorPagamento):
+    """Sincroniza automaticamente a confirmacao da inscricao com o pagamento aprovado."""
+
+    def atualizar(self, pagamento: "Pagamento", evento: str) -> None:
+        if evento == "PAGAMENTO_APROVADO":
+            pagamento.inscricao.confirmar()
+
+
+class AuditoriaPagamentoObserver(ObservadorPagamento):
+    """Registra historico de auditoria contabil para cada evento financeiro."""
+
+    def __init__(self):
+        self.historico: list[dict] = []
+
+    def atualizar(self, pagamento: "Pagamento", evento: str) -> None:
+        self.historico.append(
+            {
+                "pagamento_id": pagamento.identificador,
+                "evento": evento,
+                "valor": pagamento.valor,
+                "status": pagamento.status,
+            }
+        )
+
+
+class NotificacaoPagamentoObserver(ObservadorPagamento):
+    """Gera notificacao de comprovante para o participante."""
+
+    def __init__(self):
+        self.notificacoes_enviadas: list[str] = []
+
+    def atualizar(self, pagamento: "Pagamento", evento: str) -> None:
+        email = pagamento.inscricao.participante.email
+        self.notificacoes_enviadas.append(
+            f"Notificacao enviada para {email}: transacao {evento}"
+        )
 
 class Pagamento:
-	def __init__(self, identificador, inscricao, valor, status=StatusPagamento.PENDENTE):
-		self.identificador = identificador
-		self.inscricao = inscricao
-		self.valor = valor
-		self.status = status
+    def __init__(self, identificador, inscricao, valor, status=StatusPagamento.PENDENTE):
+        self.identificador = identificador
+        self.inscricao = inscricao
+        self.valor = valor
+        self.status = status
+        self._observadores: list[ObservadorPagamento] = []
 
-	@property
-	def _estado(self) -> EstadoPagamento:
-		return _ESTADOS_POR_STATUS[self.status]
+    @property
+    def observadores(self) -> list[ObservadorPagamento]:
+        if not hasattr(self, "_observadores"):
+            self._observadores = []
+        return self._observadores
 
-	def aprovar(self):
-		self._estado.aprovar(self)
+    def adicionar_observador(self, observador: ObservadorPagamento) -> None:
+        if observador not in self.observadores:
+            self.observadores.append(observador)
 
-	def recusar(self):
-		self._estado.recusar(self)
+    def remover_observador(self, observador: ObservadorPagamento) -> None:
+        if observador in self.observadores:
+            self.observadores.remove(observador)
 
-	def estornar(self):
-		self._estado.estornar(self)
+    def notificar(self, evento: str) -> None:
+        for obs in list(self.observadores):
+            obs.atualizar(self, evento)
+
+    @property
+    def _estado(self) -> EstadoPagamento:
+        return _ESTADOS_POR_STATUS[self.status]
+
+    def aprovar(self):
+        self._estado.aprovar(self)
+        self.notificar("PAGAMENTO_APROVADO")
+
+    def recusar(self):
+        self._estado.recusar(self)
+        self.notificar("PAGAMENTO_RECUSADO")
+
+    def estornar(self):
+        self._estado.estornar(self)
+        self.notificar("PAGAMENTO_ESTORNADO")
 
 class Documento:
     """Value Object que encapsula a regra de sanitização e validação de documentos (CPF/CNPJ)."""

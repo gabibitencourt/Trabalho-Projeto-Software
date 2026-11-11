@@ -263,3 +263,75 @@ classDiagram
 
 - **Custo:** quatro classes de estado concreto além da interface abstrata, mais a property `_estado` que faz o lookup no dicionário `_ESTADOS_POR_STATUS`. Para 4 status e 3 transições, isso é mais código do que os `if`s originais.
 - **Por que compensa:** a regra "o que pode acontecer a partir do status X" fica inteira em uma única classe, em vez de espalhada nos três métodos de `Pagamento`. Adicionar um novo status no futuro significa criar uma nova classe de estado, sem editar as transições dos estados existentes. A interface pública de `Pagamento` (`aprovar`/`recusar`/`estornar`/`status`) não mudou, então `services.py`, `flask_app.py` e todos os testes existentes continuaram funcionando sem alteração — só o `tests/unit/test_pagamento_estado.py` e o novo teste de integração foram acrescentados.
+
+# Padrão GoF: Observer
+
+- **Categoria:** Comportamental
+- **Agregado:** `Pagamento`
+- **Autor:** João Marcello (@JoaoMarcelloCosta2000)
+
+## Contexto e problema
+
+Quando um `Pagamento` tem seu ciclo de vida alterado (como aprovação, recusa ou estorno), múltiplos subsistemas e entidades precisam reagir a esse evento financeiro:
+- A `Inscricao` correspondente deve ser confirmada automaticamente assim que o pagamento for aprovado;
+- O participante precisa receber uma notificação ou recibo da transação por e-mail;
+- O livro-razão / auditoria contábil precisa registrar cada transição para fins de conciliação.
+
+Fazer com que a classe `Pagamento` invoque diretamente esses serviços ou agregados externos violaria o Princípio da Responsabilidade Única (SRP) e geraria alto acoplamento entre o domínio financeiro e infraestruturas secundárias.
+
+## Por que Observer
+
+O padrão **Observer** estabelece uma dependência um-para-muitos entre objetos, de forma que quando o sujeito (`Pagamento`) muda de estado, todos os seus observadores registrados são notificados e atualizados automaticamente.
+
+Como alternativas, considerou-se chamadas diretas no método da entidade (acoplamento excessivo) e orquestração procedural na camada de serviços (enfraquecimento do modelo de domínio com regras de negócio dispersas).
+
+## Participantes
+
+| Papel no padrão | Classe/método no sistema |
+|---|---|
+| Subject | `Pagamento`, gerencia a inscrição de interessados (`adicionar_observador`, `remover_observador`) e notifica a lista via `notificar` |
+| Observer (Interface) | `ObservadorPagamento`, contrato abstrato com o método `atualizar(pagamento, evento)` |
+| Concrete Observer | `InscricaoSyncObserver`, confirma a inscrição automaticamente após aprovação |
+| Concrete Observer | `AuditoriaPagamentoObserver`, mantém o registro histórico para conciliação contábil |
+| Concrete Observer | `NotificacaoPagamentoObserver`, simula o envio de recibo ao e-mail do participante |
+
+## Diagrama de classes
+
+```mermaid
+classDiagram
+    class Pagamento {
+        +identificador: int
+        +valor: float
+        +status: StatusPagamento
+        +observadores: list
+        +adicionar_observador(observador)
+        +remover_observador(observador)
+        +notificar(evento)
+        +aprovar()
+        +recusar()
+        +estornar()
+    }
+
+    class ObservadorPagamento {
+        <<interface>>
+        +atualizar(pagamento: Pagamento, evento: str)*
+    }
+
+    class InscricaoSyncObserver {
+        +atualizar(pagamento: Pagamento, evento: str)
+    }
+
+    class AuditoriaPagamentoObserver {
+        +historico: list
+        +atualizar(pagamento: Pagamento, evento: str)
+    }
+
+    class NotificacaoPagamentoObserver {
+        +notificacoes_enviadas: list
+        +atualizar(pagamento: Pagamento, evento: str)
+    }
+
+    Pagamento o-- ObservadorPagamento : notifica
+    ObservadorPagamento <|.. InscricaoSyncObserver
+    ObservadorPagamento <|.. AuditoriaPagamentoObserver
+    ObservadorPagamento <|.. NotificacaoPagamentoObserver
