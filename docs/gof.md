@@ -176,3 +176,90 @@ Os testes unitários em `tests/unit/test_participante.py` exercitam:
 O custo principal foi a introdução da interface abstrata `AbstractParticipante`, da classe base `ParticipanteDecorator` e das subclasses de decoradores concretos, além de pequenas indireções no acesso aos atributos.
 
 Em contrapartida, o benefício é a capacidade de combinar privilégios livremente em tempo de execução sem alterar o modelo de dados nem modificar o schema do banco relacional.
+
+
+# Padrão GoF: State
+
+- **Categoria:** Comportamental
+- **Agregado:** `Pagamento`
+- **Autor:** Lucas Paixao de Lima Costa (@LucasLimmm2000)
+
+## Contexto e problema
+
+O `Pagamento` tem quatro status (`PENDENTE`, `APROVADO`, `RECUSADO`, `ESTORNADO`) e três transições (`aprovar`, `recusar`, `estornar`), cada uma válida só a partir de alguns status. Antes desta refatoração, os três métodos viviam na própria classe `Pagamento` e cada um checava o status atual com `if`/comparação de enum antes de decidir se a transição era permitida (ver ADR-005, que já documentava essa decisão na Fase 1).
+
+Isso funciona, mas concentra em `Pagamento` o conhecimento de todas as combinações válidas entre status e transição. A cada novo status ou nova transição, os três métodos (ou mais) precisariam ser revisados, e a regra "o que pode acontecer a partir do status X" fica espalhada em vários `if`s em vez de estar num lugar só.
+
+## Por que State
+
+O padrão **State** resolve isso movendo o comportamento de cada transição para uma classe por status: `_EstadoPendente`, `_EstadoAprovado`, `_EstadoRecusado` e `_EstadoEstornado` implementam `aprovar`, `recusar` e `estornar` cada uma à sua maneira — permitindo a transição e trocando o status, ou levantando `OperacaoInvalidaError`. O agregado `Pagamento` não guarda mais a regra: ele resolve o estado atual a partir do `status` persistido e delega a chamada.
+
+Considerei manter as condicionais como estavam (mais simples para só 4 status), mas o GoF State decompõe exatamente esse tipo de máquina de estados finita, e o agregado Pagamento é o que no sistema modela o ciclo de vida mais explícito via enum. Como alternativa, cheguei a pensar num campo de status "livre" (string) com uma tabela de transições, mas isso é o que o próprio ADR-005 já rejeitou — o enum fechado (`StatusPagamento`) continua sendo a fonte da verdade, e o State só organiza o comportamento associado a cada valor dele.
+
+**Decisão de projeto importante:** o `_estado` **não é guardado como atributo no `__init__`** — é uma `@property` que consulta um dicionário `_ESTADOS_POR_STATUS` a partir de `self.status` a cada chamada. Isso é necessário porque o `SqlAlchemyPagamentoRepository` usa mapeamento imperativo (`map_imperatively`): ao recarregar um `Pagamento` do banco, o SQLAlchemy reconstrói o objeto e popula `status` direto, **sem passar pelo `__init__`**. Um `_estado` calculado só na construção ficaria desatualizado nesse cenário (o mesmo cuidado que o Arthur já registrou na refatoração OCP do `Evento`, em `docs/solid.md`).
+
+## Participantes
+
+| Papel no padrão | Classe/método no sistema |
+|---|---|
+| Contexto | `Pagamento`, que mantém `status` e delega `aprovar`/`recusar`/`estornar` via a property `_estado` |
+| State | `EstadoPagamento`, contrato abstrato com `aprovar`, `recusar` e `estornar` |
+| Concrete State | `_EstadoPendente` — permite aprovar e recusar; bloqueia estornar |
+| Concrete State | `_EstadoAprovado` — permite estornar (se não houve check-in); bloqueia aprovar e recusar |
+| Concrete State | `_EstadoRecusado` — bloqueia as três transições |
+| Concrete State | `_EstadoEstornado` — bloqueia as três transições |
+
+## Diagrama de classes
+
+```mermaid
+classDiagram
+    class Pagamento {
+        +status: StatusPagamento
+        +aprovar()
+        +recusar()
+        +estornar()
+    }
+    class EstadoPagamento {
+        <<abstract>>
+        +aprovar(pagamento)
+        +recusar(pagamento)
+        +estornar(pagamento)
+    }
+    class _EstadoPendente {
+        +aprovar(pagamento)
+        +recusar(pagamento)
+        +estornar(pagamento)
+    }
+    class _EstadoAprovado {
+        +aprovar(pagamento)
+        +recusar(pagamento)
+        +estornar(pagamento)
+    }
+    class _EstadoRecusado {
+        +aprovar(pagamento)
+        +recusar(pagamento)
+        +estornar(pagamento)
+    }
+    class _EstadoEstornado {
+        +aprovar(pagamento)
+        +recusar(pagamento)
+        +estornar(pagamento)
+    }
+
+    Pagamento ..> EstadoPagamento : resolve via status
+    EstadoPagamento <|.. _EstadoPendente
+    EstadoPagamento <|.. _EstadoAprovado
+    EstadoPagamento <|.. _EstadoRecusado
+    EstadoPagamento <|.. _EstadoEstornado
+```
+
+## Teste
+
+- `tests/unit/test_pagamento.py` — já existia e continuou passando sem alteração; cobre as transições válidas e inválidas pela interface pública de `Pagamento`, provando que o comportamento não mudou.
+- `tests/unit/test_pagamento_estado.py` (novo) — testa o padrão diretamente: `test_pagamento_*_resolve_estado_*` confirma que cada status resolve para a classe de estado correta; `test_estado_e_reavaliado_apos_transicao` prova que o estado não fica em cache depois de uma transição; `test_estado_recusado_nao_permite_aprovar_nem_estornar` cobre um estado "terminal".
+- `tests/integration/test_repository_pagamento.py::test_pagamento_recarregado_do_banco_resolve_estado_pelo_status_persistido` (novo) — recarrega um `Pagamento` do SQLite via `session.expire_all()` (contornando a identity map, sem passar pelo `__init__`) e confirma que `_estado` ainda resolve corretamente a partir do `status` persistido.
+
+## Custo da aplicação
+
+- **Custo:** quatro classes de estado concreto além da interface abstrata, mais a property `_estado` que faz o lookup no dicionário `_ESTADOS_POR_STATUS`. Para 4 status e 3 transições, isso é mais código do que os `if`s originais.
+- **Por que compensa:** a regra "o que pode acontecer a partir do status X" fica inteira em uma única classe, em vez de espalhada nos três métodos de `Pagamento`. Adicionar um novo status no futuro significa criar uma nova classe de estado, sem editar as transições dos estados existentes. A interface pública de `Pagamento` (`aprovar`/`recusar`/`estornar`/`status`) não mudou, então `services.py`, `flask_app.py` e todos os testes existentes continuaram funcionando sem alteração — só o `tests/unit/test_pagamento_estado.py` e o novo teste de integração foram acrescentados.

@@ -202,6 +202,22 @@ Nenhuma.
 - **Justificativa de decisão de projeto:** O ADR cobre as transições de `recusar`/`estornar`, que ficaram fora do ADR-003 (do João, sobre a orquestração de `registrar`/`obter`/`aprovar` na camada de serviço) — registrando especificamente por que a guarda de pré-condição fica no método da entidade, e não repetida na camada de serviço ou na rota.
 - **Uso de IA Generativa (conforme Seção 2.5):**
 
+#### Checkpoint 2 (03/11/2026) - Refatoração SOLID
+
+- **Arquivos sob minha responsabilidade:** `src/eventos/adapters/repository.py` (`AbstractPagamentoRepository.commit`, `FakePagamentoRepository.commit`, `SqlAlchemyPagamentoRepository.commit`), `src/eventos/service_layer/services.py` (`registrar_pagamento`, `aprovar_pagamento`, `recusar_pagamento`, `estornar_pagamento`, `confirmar_inscricao_apos_pagamento`), `src/eventos/entrypoints/flask_app.py` (rotas de `/pagamentos`), `tests/unit/test_services_pagamento.py` e `docs/solid.md`.
+- **Intervalo/Hashes de Commits:**
+- **O que implementei:** Corrigi uma violação do DIP nos casos de uso de pagamento: o commit da transação estava nas rotas Flask (`session.commit()` chamado direto na sessão do SQLAlchemy), e não no serviço. Adicionei `commit()` em `AbstractPagamentoRepository` (implementado no `SqlAlchemyPagamentoRepository` e no `FakePagamentoRepository`), e os cinco casos de uso de pagamento passaram a chamar `repositorio.commit()` no final, deixando de depender da rota pra salvar. `confirmar_inscricao_apos_pagamento` comita o `repositorio_inscricao` (cruza os agregados Pagamento → Inscrição). Adicionei 4 testes novos em `tests/unit/test_services_pagamento.py` verificando o commit via `FakePagamentoRepository`/`FakeInscricaoRepository`.
+- **Justificativa de decisão de projeto:** Mesmo padrão que o Samuel já tinha aplicado em `AbstractInscricaoRepository` — segui a convenção já estabelecida no time em vez de propor outra abordagem, pra manter os dois agregados consistentes. Mantive o commit no repositório (não numa Unit of Work), porque isso é só o módulo de Pagamento, e a Unit of Work completa está proposta no ADR-004 do Samuel.
+- **Uso de IA Generativa (conforme Seção 2.5):**
+
+#### Checkpoint 3 (10/11/2026) - Padrão GoF State
+
+- **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py` (`EstadoPagamento` e as classes `_EstadoPendente`, `_EstadoAprovado`, `_EstadoRecusado`, `_EstadoEstornado`), `tests/unit/test_pagamento_estado.py` (novo), `tests/integration/test_repository_pagamento.py` e `docs/gof.md`.
+- **Intervalo/Hashes de Commits:**
+- **O que implementei:** Apliquei o padrão GoF State no agregado Pagamento. As transições `aprovar`/`recusar`/`estornar`, que antes eram `if`s comparando `self.status` dentro da própria classe `Pagamento`, passaram a ser delegadas para uma classe de estado por status (`_EstadoPendente`, `_EstadoAprovado`, `_EstadoRecusado`, `_EstadoEstornado`), resolvida por uma property `_estado` a partir do `status` atual. A interface pública de `Pagamento` não mudou.
+- **Justificativa de decisão de projeto:** O `_estado` é recalculado a cada acesso (não guardado como atributo fixado no `__init__`) porque o `SqlAlchemyPagamentoRepository` usa mapeamento imperativo: ao recarregar um `Pagamento` do banco, o SQLAlchemy popula `status` direto, sem passar pelo `__init__` do agregado. Um estado cacheado na construção ficaria desatualizado nesse cenário — adicionei um teste de integração específico pra provar isso (`test_pagamento_recarregado_do_banco_resolve_estado_pelo_status_persistido`).
+- **Uso de IA Generativa (conforme Seção 2.5):**
+
 ---
 
 ### Samuel Carvalho Dias (@SamuelCDiias)
