@@ -2,7 +2,7 @@ from datetime import date
 
 from eventos.domain.model import (
     Evento,
-    Inscricao,
+    FabricaInscricaoPaga,
     OperacaoInvalidaError,
     Pagamento,
     StatusEvento,
@@ -16,12 +16,8 @@ class InscricaoNaoEncontradaError(Exception):
     pass
 
 
-def criar_inscricao(identificador, participante, lote, repositorio):
-    inscricao = Inscricao(
-        identificador=identificador,
-        participante=participante,
-        lote=lote,
-    )
+def criar_inscricao(identificador, participante, lote, repositorio, fabrica=FabricaInscricaoPaga()):
+    inscricao = fabrica.criar(identificador, participante, lote)
     repositorio.adicionar(inscricao)
     repositorio.commit()
     return inscricao

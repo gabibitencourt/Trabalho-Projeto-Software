@@ -96,3 +96,9 @@ def test_nao_permite_checkin_em_inscricao_pendente(client):
     # 3. Deve falhar com erro 400 (OperacaoInvalidaError)
     assert resposta.status_code == 400
     assert "check-in exige inscricao confirmada" in resposta.get_json()["erro"]
+
+def test_cria_inscricao_cortesia_ja_confirmada(client):
+    resposta = client.post("/inscricoes", json={**dados_da_inscricao(), "cortesia": True})
+
+    assert resposta.status_code == 201
+    assert resposta.get_json()["status"] == "confirmada"
