@@ -178,6 +178,24 @@ class Inscricao:
         return self.checkin
 
 
+class FabricaDeInscricao(abc.ABC):
+    @abc.abstractmethod
+    def criar(self, identificador, participante, lote) -> Inscricao:
+        raise NotImplementedError
+
+
+class FabricaInscricaoPaga(FabricaDeInscricao):
+    def criar(self, identificador, participante, lote):
+        return Inscricao(identificador, participante, lote)
+
+
+class FabricaInscricaoCortesia(FabricaDeInscricao):
+    def criar(self, identificador, participante, lote):
+        inscricao = Inscricao(identificador, participante, lote)
+        inscricao.confirmar()
+        return inscricao
+
+
 class EstadoPagamento(abc.ABC):
 	"""State (GoF) do agregado Pagamento: cada status concentra as transicoes validas a partir dele."""
 

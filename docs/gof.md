@@ -335,3 +335,82 @@ classDiagram
     ObservadorPagamento <|.. InscricaoSyncObserver
     ObservadorPagamento <|.. AuditoriaPagamentoObserver
     ObservadorPagamento <|.. NotificacaoPagamentoObserver
+```
+
+## Teste
+
+Os testes unitários em `tests/unit/test_pagamento_observer.py` exercitam:
+- `test_gof_observer_sincroniza_confirmacao_de_inscricao_ao_aprovar`: comprova a reação e confirmação automática da inscrição acoplada ao evento financeiro.
+- `test_gof_observer_auditoria_e_notificacao_registram_multiplos_eventos`: testa múltiplos observadores conectados ao mesmo sujeito recebendo aprovação e estorno.
+- `test_gof_observer_remover_observador_impede_notificacao`: valida a desinscrição dinâmica de observadores.
+
+## Custo da aplicação
+
+O custo do padrão foi a introdução da interface `ObservadorPagamento`, das classes concretas de observação e do gerenciador de ouvintes dentro de `Pagamento`. Em contrapartida, desacoplou-se completamente o processamento financeiro das regras de notificação, auditoria e sincronização entre agregados.
+    
+# Padrão GoF: Factory Method
+
+- **Categoria:** Criacional
+- **Agregado:** `Inscricao`
+- **Autor:** Samuel Carvalho Dias (@SamuelCDiias)
+
+## Contexto e problema
+
+Toda `Inscricao` nascia `PENDENTE`, aguardando pagamento. Inscrições de cortesia (palestrantes, convidados, equipe) não passam por pagamento e precisam nascer `CONFIRMADA`, prontas para o check-in. Sem um ponto de criação, `services.criar_inscricao` teria que conhecer cada tipo de inscrição e montar cada uma com condicionais, e cada novo tipo exigiria editar o caso de uso.
+
+## Por que Factory Method
+
+O **Factory Method** tira a decisão de "como nasce a inscrição" do caso de uso. `services.criar_inscricao` recebe uma `FabricaDeInscricao` e chama `criar`; cada fábrica concreta decide o estado inicial. A rota `POST /inscricoes` escolhe a fábrica pelo campo `cortesia` da requisição, e o padrão continua sendo a inscrição paga.
+
+Alternativas consideradas:
+- **Parâmetro `cortesia` no construtor de `Inscricao`:** mais simples, mas mistura regras de cada tipo no agregado e faz o `__init__` crescer a cada novo tipo.
+- **Subclasse `InscricaoCortesia`:** exigiria mapeamento polimórfico no SQLAlchemy (coluna discriminadora e migração do esquema) só para mudar o estado inicial.
+
+## Participantes
+
+| Papel no padrão | Classe/método no sistema |
+|---|---|
+| Creator | `FabricaDeInscricao`, com o factory method abstrato `criar` |
+| Concrete Creator | `FabricaInscricaoPaga`, que cria a inscrição `PENDENTE` |
+| Concrete Creator | `FabricaInscricaoCortesia`, que cria a inscrição já `CONFIRMADA` |
+| Product | `Inscricao` |
+| Cliente | `services.criar_inscricao`, que recebe a fábrica (padrão: `FabricaInscricaoPaga`) |
+
+## Diagrama de classes
+
+```mermaid
+classDiagram
+    class FabricaDeInscricao {
+        <<abstract>>
+        +criar(identificador, participante, lote) Inscricao
+    }
+    class FabricaInscricaoPaga {
+        +criar(identificador, participante, lote) Inscricao
+    }
+    class FabricaInscricaoCortesia {
+        +criar(identificador, participante, lote) Inscricao
+    }
+    class Inscricao {
+        +status: StatusInscricao
+        +confirmar()
+    }
+    class criar_inscricao {
+        <<service>>
+    }
+
+    FabricaDeInscricao <|-- FabricaInscricaoPaga
+    FabricaDeInscricao <|-- FabricaInscricaoCortesia
+    FabricaDeInscricao ..> Inscricao : cria
+    criar_inscricao ..> FabricaDeInscricao : usa
+```
+
+## Teste
+
+- `tests/unit/test_inscricao_factory.py`: `test_fabrica_paga_cria_inscricao_pendente`, `test_fabrica_cortesia_cria_inscricao_confirmada`, `test_inscricao_cortesia_permite_checkin_sem_pagamento`, `test_servico_usa_fabrica_paga_por_padrao` e `test_servico_cria_inscricao_com_a_fabrica_recebida`.
+- `tests/e2e/test_inscricoes_api.py::test_cria_inscricao_cortesia_ja_confirmada`: cria uma inscrição de cortesia pela API.
+- Os testes existentes de inscrição continuaram passando sem alteração.
+
+## Custo da aplicação
+
+- **Custo:** uma classe abstrata e duas fábricas concretas para dois tipos de inscrição, mais um parâmetro em `criar_inscricao`. Com só dois tipos, é mais indireção do que um `if` no serviço.
+- **Benefício:** um novo tipo de inscrição entra como uma nova fábrica, sem editar `Inscricao` nem o caso de uso. Como o produto continua sendo `Inscricao`, não há mudança no mapeamento ORM nem no esquema do banco, e a chamada existente de `criar_inscricao` continua funcionando pelo valor padrão.

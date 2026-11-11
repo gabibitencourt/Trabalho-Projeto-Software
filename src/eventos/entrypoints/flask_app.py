@@ -9,7 +9,12 @@ from eventos.adapters.repository import (
     SqlAlchemyEventoRepository,
     SqlAlchemyLoteDeIngressoRepository
 )
-from eventos.domain.model import OperacaoInvalidaError, Participante
+from eventos.domain.model import (
+    FabricaInscricaoCortesia,
+    FabricaInscricaoPaga,
+    OperacaoInvalidaError,
+    Participante,
+)
 from eventos.service_layer import services
 
 
@@ -150,6 +155,7 @@ def create_app(session=None):
                 participante=participante,
                 lote=dados["lote"],
                 repositorio=repository,
+                fabrica=FabricaInscricaoCortesia() if dados.get("cortesia") else FabricaInscricaoPaga(),
             )
         except KeyError as error:
             raise ValueError(f"campo obrigatorio: {error.args[0]}") from error
