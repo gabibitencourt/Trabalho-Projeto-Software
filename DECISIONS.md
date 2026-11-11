@@ -113,7 +113,7 @@ usei para esclarecer conceitos de sobre a camada de serviço
 
 #### Checkpoint 3 (10/11/2026) - Padrões GoF
 - **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py` (`Evento.criar_memento`, `Evento.restaurar`, `EventoMemento`, `_InstantaneoLote` e `HistoricoEvento`), `tests/unit/test_evento.py`, `docs/gof.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** 
+- **Intervalo/Hashes de Commits:** b9c4904d833
 - **O que implementei:** Aplicação do padrão GoF comportamental **Memento** no agregado `Evento`, permitindo salvar instantâneos imutáveis (`EventoMemento`) do estado do evento e do seu catálogo de lotes (`_InstantaneoLote`) e restaurá-los por meio do *Caretaker* `HistoricoEvento` (`salvar` e `desfazer`), além de 4 testes unitários em `tests/unit/test_evento.py` e documentação com diagrama de classes em `docs/gof.md`.
 - **Justificativa de decisão de projeto:** Optei por serializar os atributos de cada `LoteDeIngresso` em `_InstantaneoLote` (imutável com `frozen=True`) e atualizar `self._lotes[:] = ...` *in-place* na restauração para garantir tanto o isolamento contra mutações posteriores nos lotes (`lote.venda()`) quanto a preservação da `InstrumentedList` do mapeamento clássico do SQLAlchemy (`map_imperatively`), bloqueando ainda a restauração caso o evento já esteja `ENCERRADO`.
 - **Uso de IA Generativa (conforme Seção 2):** Utilização de assistente de IA para avaliação de qual padrão GoF ainda não utilizado pelo grupo que melhor resolvia o problema de reversão de estado no agregado `Evento` e diagrama Mermaid em `docs/gof.md`.
