@@ -177,6 +177,78 @@ class Inscricao:
         return self.checkin
 
 
+class EstadoPagamento(abc.ABC):
+	"""State (GoF) do agregado Pagamento: cada status concentra as transicoes validas a partir dele."""
+
+	@abc.abstractmethod
+	def aprovar(self, pagamento: "Pagamento") -> None:
+		raise NotImplementedError
+
+	@abc.abstractmethod
+	def recusar(self, pagamento: "Pagamento") -> None:
+		raise NotImplementedError
+
+	@abc.abstractmethod
+	def estornar(self, pagamento: "Pagamento") -> None:
+		raise NotImplementedError
+
+
+class _EstadoPendente(EstadoPagamento):
+	def aprovar(self, pagamento):
+		pagamento.status = StatusPagamento.APROVADO
+
+	def recusar(self, pagamento):
+		pagamento.status = StatusPagamento.RECUSADO
+
+	def estornar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento aprovado pode ser estornado")
+
+
+class _EstadoAprovado(EstadoPagamento):
+	def aprovar(self, pagamento):
+		raise OperacaoInvalidaError("pagamento aprovado nao pode ser reprocessado")
+
+	def recusar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento pendente pode ser recusado")
+
+	def estornar(self, pagamento):
+		if pagamento.inscricao.checkin_realizado:
+			raise OperacaoInvalidaError(
+				"nao e possivel estornar pagamento de inscricao com check-in"
+			)
+		pagamento.status = StatusPagamento.ESTORNADO
+
+
+class _EstadoRecusado(EstadoPagamento):
+	def aprovar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento pendente pode ser aprovado")
+
+	def recusar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento pendente pode ser recusado")
+
+	def estornar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento aprovado pode ser estornado")
+
+
+class _EstadoEstornado(EstadoPagamento):
+	def aprovar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento pendente pode ser aprovado")
+
+	def recusar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento pendente pode ser recusado")
+
+	def estornar(self, pagamento):
+		raise OperacaoInvalidaError("apenas pagamento aprovado pode ser estornado")
+
+
+_ESTADOS_POR_STATUS: dict[StatusPagamento, EstadoPagamento] = {
+	StatusPagamento.PENDENTE: _EstadoPendente(),
+	StatusPagamento.APROVADO: _EstadoAprovado(),
+	StatusPagamento.RECUSADO: _EstadoRecusado(),
+	StatusPagamento.ESTORNADO: _EstadoEstornado(),
+}
+
+
 class Pagamento:
 	def __init__(self, identificador, inscricao, valor, status=StatusPagamento.PENDENTE):
 		self.identificador = identificador
@@ -184,26 +256,18 @@ class Pagamento:
 		self.valor = valor
 		self.status = status
 
+	@property
+	def _estado(self) -> EstadoPagamento:
+		return _ESTADOS_POR_STATUS[self.status]
+
 	def aprovar(self):
-		if self.status is StatusPagamento.APROVADO:
-			raise OperacaoInvalidaError("pagamento aprovado nao pode ser reprocessado")
-		if self.status is not StatusPagamento.PENDENTE:
-			raise OperacaoInvalidaError("apenas pagamento pendente pode ser aprovado")
-		self.status = StatusPagamento.APROVADO
+		self._estado.aprovar(self)
 
 	def recusar(self):
-		if self.status is not StatusPagamento.PENDENTE:
-			raise OperacaoInvalidaError("apenas pagamento pendente pode ser recusado")
-		self.status = StatusPagamento.RECUSADO
+		self._estado.recusar(self)
 
 	def estornar(self):
-		if self.status is not StatusPagamento.APROVADO:
-			raise OperacaoInvalidaError("apenas pagamento aprovado pode ser estornado")
-		if self.inscricao.checkin_realizado:
-			raise OperacaoInvalidaError(
-				"nao e possivel estornar pagamento de inscricao com check-in"
-			)
-		self.status = StatusPagamento.ESTORNADO
+		self._estado.estornar(self)
 
 class Documento:
     """Value Object que encapsula a regra de sanitização e validação de documentos (CPF/CNPJ)."""
