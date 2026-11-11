@@ -87,6 +87,70 @@ class RegraNaoAlterarPrecoComVendas(RegraAlteracaoLote):
 			)
 
 
+@dataclass(frozen=True)
+class _InstantaneoLote:
+	identificador: int
+	nome: str
+	preco: float
+	quant_total: int
+	quant_vendida: int
+
+	@classmethod
+	def de_lote(cls, lote: "LoteDeIngresso") -> "_InstantaneoLote":
+		return cls(
+			identificador=lote.identificador,
+			nome=lote.nome,
+			preco=lote.preco,
+			quant_total=lote.quant_total,
+			quant_vendida=lote.quant_vendida,
+		)
+
+	def reconstruir(self) -> "LoteDeIngresso":
+		return LoteDeIngresso(
+			identificador=self.identificador,
+			nome=self.nome,
+			preco=self.preco,
+			quant_total=self.quant_total,
+			quant_vendida=self.quant_vendida,
+		)
+
+
+@dataclass(frozen=True)
+class EventoMemento:
+	"""Memento (GoF) que armazena um instantaneo imutavel do estado de Evento."""
+
+	identificador: int
+	nome: str
+	data: object
+	local: str
+	status: StatusEvento
+	_lotes: tuple[_InstantaneoLote, ...]
+	_regras_alteracao_lote: tuple[RegraAlteracaoLote, ...]
+
+
+class HistoricoEvento:
+	"""Caretaker (GoF) que gerencia a pilha de instantaneos (mementos) de um Evento."""
+
+	def __init__(self):
+		self._historico: list[EventoMemento] = []
+
+	@property
+	def quantidade_estados(self) -> int:
+		return len(self._historico)
+
+	def salvar(self, evento: "Evento") -> EventoMemento:
+		memento = evento.criar_memento()
+		self._historico.append(memento)
+		return memento
+
+	def desfazer(self, evento: "Evento") -> EventoMemento:
+		if not self._historico:
+			raise OperacaoInvalidaError("nao ha estado anterior para restaurar")
+		memento = self._historico[-1]
+		evento.restaurar(memento)
+		return self._historico.pop()
+
+
 class Evento:
 	_regras_alteracao_lote = (RegraNaoReduzirCapacidadeAbaixoDoVendido(),)
 
@@ -133,6 +197,33 @@ class Evento:
 		self.status = _CicloDeVidaEvento.encerrar(
 			self.status, inscricoes_pendentes
 		)
+
+	def criar_memento(self) -> EventoMemento:
+		return EventoMemento(
+			identificador=self.identificador,
+			nome=self.nome,
+			data=self.data,
+			local=self.local,
+			status=self.status,
+			_lotes=tuple(_InstantaneoLote.de_lote(lote) for lote in self._lotes),
+			_regras_alteracao_lote=tuple(self._regras_alteracao_lote),
+		)
+
+	def restaurar(self, memento: EventoMemento) -> None:
+		if memento.identificador != self.identificador:
+			raise OperacaoInvalidaError("memento nao pertence a este evento")
+		if self.status is StatusEvento.ENCERRADO:
+			raise OperacaoInvalidaError(
+				"nao e possivel restaurar estado de evento ja encerrado"
+			)
+		self.nome = memento.nome
+		self.data = memento.data
+		self.local = memento.local
+		self.status = memento.status
+		self._lotes[:] = [
+			instantaneo.reconstruir() for instantaneo in memento._lotes
+		]
+		self._regras_alteracao_lote = tuple(memento._regras_alteracao_lote)
 
 class Inscricao:
     def __init__(self, identificador, participante, lote):

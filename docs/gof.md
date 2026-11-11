@@ -414,3 +414,100 @@ classDiagram
 
 - **Custo:** uma classe abstrata e duas fábricas concretas para dois tipos de inscrição, mais um parâmetro em `criar_inscricao`. Com só dois tipos, é mais indireção do que um `if` no serviço.
 - **Benefício:** um novo tipo de inscrição entra como uma nova fábrica, sem editar `Inscricao` nem o caso de uso. Como o produto continua sendo `Inscricao`, não há mudança no mapeamento ORM nem no esquema do banco, e a chamada existente de `criar_inscricao` continua funcionando pelo valor padrão.
+
+
+# Padrão GoF: Memento
+
+- **Categoria:** Comportamental
+- **Agregado:** `Evento`
+- **Autor:** Arthur Siqueira Campos Alexandrino (@devalexandrino)
+
+## Contexto e problema
+
+Durante o planejamento e a operação de um `Evento`, o organizador realiza sucessivas edições na configuração do evento e no seu catálogo de lotes (`adicionar_lote`, `alterar_lote`, mudança de nome/local e transição de início com `iniciar()`). Na prática, é comum que um organizador configure novos lotes promocionais, reajuste capacidades/preços em lote ou inicie o evento por engano e precise desfazer a operação, restaurando o agregado para o último ponto de configuração válido.
+
+No entanto, a raiz do agregado `Evento` encapsula estritamente sua coleção interna `self._lotes`, expondo a propriedade `evento.lotes` apenas como uma `tuple` somente-leitura (sem *setter*). Sem um mecanismo próprio de captura e restauração, qualquer tentativa externa de salvar e reverter o estado de `Evento` violaria o encapsulamento ao manipular diretamente `evento._lotes`. Além disso, guardar apenas referências para as instâncias de `LoteDeIngresso` não protegeria o estado salvo contra mutações internas nos próprios lotes (como a atualização de `quant_vendida` via `lote.venda()`).
+
+## Por que Memento
+
+O padrão **Memento** permite capturar e externalizar um instantâneo completo do estado interno de `Evento` (`EventoMemento`) sem violar o seu encapsulamento, permitindo que o agregado seja restaurado posteriormente a esse estado com garantia de integridade das invariantes de negócio (como bloquear a reversão de um evento que já foi `ENCERRADO` ou rejeitar um instantâneo pertencente a outro `identificador` de evento).
+
+Alternativas consideradas:
+- **Expor um *setter* `evento.lotes = ...` ou manipular `evento._lotes` externamente:** descartada porque quebraria o encapsulamento da raiz do agregado (verificado inclusive pelo teste existente `test_evento_adiciona_lote_sem_expor_lista_mutavel`), permitindo que código cliente contornasse as regras `RegraAlteracaoLote` e `_CicloDeVidaEvento`.
+- **Clonagem externa com `copy.deepcopy(evento)`:** descartada porque transfere para o chamador a responsabilidade de substituir a referência da instância inteira de `Evento` (o que conflita com o controle de identidade da sessão do SQLAlchemy) e não centraliza no domínio as validações de segurança no momento da restauração (por exemplo, impedir que um evento já `ENCERRADO` volte a `PLANEJADO`).
+
+## Participantes
+
+| Papel no padrão | Classe/método no sistema |
+|---|---|
+| Originator | `Evento`, que gera o instantâneo em `criar_memento()` e restaura seu estado interno em `restaurar(memento)` |
+| Memento | `EventoMemento` (auxiliado por `_InstantaneoLote`), `dataclass(frozen=True)` imutável que armazena o estado de `Evento` e a cópia de valor dos seus lotes |
+| Caretaker | `HistoricoEvento`, que gerencia a pilha de instantâneos (`salvar(evento)` e `desfazer(evento)`) sem inspecionar ou alterar o conteúdo interno do memento |
+
+## Diagrama de classes
+
+```mermaid
+classDiagram
+    class Evento {
+        +identificador: int
+        +nome: str
+        +data: date
+        +local: str
+        +status: StatusEvento
+        -_lotes: list~LoteDeIngresso~
+        -_regras_alteracao_lote: tuple~RegraAlteracaoLote~
+        +adicionar_lote(lote)
+        +alterar_lote(identificador_lote, lote_atualizado)
+        +iniciar()
+        +encerrar(inscricoes_pendentes)
+        +criar_memento() EventoMemento
+        +restaurar(memento: EventoMemento) None
+    }
+
+    class EventoMemento {
+        <<frozen dataclass>>
+        +identificador: int
+        +nome: str
+        +data: date
+        +local: str
+        +status: StatusEvento
+        -_lotes: tuple~_InstantaneoLote~
+        -_regras_alteracao_lote: tuple~RegraAlteracaoLote~
+    }
+
+    class _InstantaneoLote {
+        <<frozen dataclass>>
+        +identificador: int
+        +nome: str
+        +preco: float
+        +quant_total: int
+        +quant_vendida: int
+        +de_lote(lote) _InstantaneoLote$
+        +reconstruir() LoteDeIngresso
+    }
+
+    class HistoricoEvento {
+        -_historico: list~EventoMemento~
+        +quantidade_estados: int
+        +salvar(evento: Evento) EventoMemento
+        +desfazer(evento: Evento) EventoMemento
+    }
+
+    HistoricoEvento o-- EventoMemento : armazena pilha
+    HistoricoEvento ..> Evento : solicita salvar/desfazer
+    Evento ..> EventoMemento : cria e restaura
+    EventoMemento *-- _InstantaneoLote : compõe cópia dos lotes
+```
+
+## Teste
+
+Os testes unitários em `tests/unit/test_evento.py` exercitam diretamente o padrão:
+- `test_gof_memento_restaura_catalogo_de_lotes_e_dados_do_evento`: salva o estado de um `Evento` planejado no `HistoricoEvento`, realiza alterações de nome, modificação de lote existente, adição de novo lote e início do evento, e comprova que `historico.desfazer(evento)` restaura integralmente o estado anterior.
+- `test_gof_memento_isola_instantaneo_contra_mutacoes_internas_no_lote`: comprova que a cópia profunda em `_InstantaneoLote` protege o memento mesmo quando o objeto `LoteDeIngresso` sofre mutação interna (`lote.venda()`) após o salvamento.
+- `test_gof_memento_bloqueia_restauracao_em_evento_encerrado_ou_id_divergente`: verifica as invariantes de domínio no `Originator` (impedir restauração de memento de outro evento ou reversão de um evento já `ENCERRADO`, preservando a pilha do histórico).
+- `test_gof_memento_historico_vazio_rejeita_desfazer`: garante que `HistoricoEvento.desfazer` sinaliza `OperacaoInvalidaError` quando não há estados salvos.
+
+## Custo da aplicação
+
+- **Custo:** criação de três novas estruturas (`_InstantaneoLote`, `EventoMemento` e `HistoricoEvento`) e dois métodos em `Evento` (`criar_memento` e `restaurar`), além do consumo adicional de memória proporcional ao número de instantâneos empilhados em `HistoricoEvento` e à quantidade de lotes copiados por instantâneo.
+- **Por que compensa:** permite desfazer configurações de lotes e alterações de estado em `Evento` mantendo `self._lotes` totalmente encapsulado, protege o histórico contra mutações por referência nos objetos `LoteDeIngresso` e preserva total compatibilidade com o mapeamento imperativo do SQLAlchemy (`map_imperatively`), já que a restauração atualiza a lista `_lotes` *in-place* (`self._lotes[:] = ...`) sem substituir a coleção instrumentada pelo ORM nem alterar o esquema do banco.

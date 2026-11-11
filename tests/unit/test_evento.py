@@ -4,6 +4,8 @@ import pytest
 
 from eventos.domain.model import (
     Evento,
+    EventoMemento,
+    HistoricoEvento,
     LoteDeIngresso,
     OperacaoInvalidaError,
     RegraAlteracaoLote,
@@ -210,3 +212,85 @@ def test_nao_inicia_evento_encerrado():
 
     with pytest.raises(OperacaoInvalidaError):
         evento.iniciar()
+
+
+def test_gof_memento_restaura_catalogo_de_lotes_e_dados_do_evento():
+    evento = criar_evento()
+    lote_inicial = LoteDeIngresso(1, "1o Lote", 100.0, quant_total=50, quant_vendida=10)
+    evento.adicionar_lote(lote_inicial)
+
+    historico = HistoricoEvento()
+    memento = historico.salvar(evento)
+
+    evento.nome = "Conferencia Alterada"
+    evento.alterar_lote(1, LoteDeIngresso(1, "1o Lote Reajustado", 150.0, quant_total=80, quant_vendida=10))
+    evento.adicionar_lote(LoteDeIngresso(2, "2o Lote Extra", 200.0, quant_total=30))
+    evento.iniciar()
+
+    assert isinstance(memento, EventoMemento)
+    assert historico.quantidade_estados == 1
+    assert len(evento.lotes) == 2
+    assert evento.status is StatusEvento.EM_ANDAMENTO
+
+    historico.desfazer(evento)
+
+    assert historico.quantidade_estados == 0
+    assert evento.nome == "Conferencia de Software"
+    assert evento.status is StatusEvento.PLANEJADO
+    assert len(evento.lotes) == 1
+    assert evento.lotes[0].identificador == 1
+    assert evento.lotes[0].nome == "1o Lote"
+    assert evento.lotes[0].preco == 100.0
+    assert evento.lotes[0].quant_total == 50
+    assert evento.lotes[0].quant_vendida == 10
+
+
+def test_gof_memento_isola_instantaneo_contra_mutacoes_internas_no_lote():
+    evento = criar_evento()
+    lote = LoteDeIngresso(1, "Lote Promocional", 80.0, quant_total=10, quant_vendida=2)
+    evento.adicionar_lote(lote)
+
+    historico = HistoricoEvento()
+    historico.salvar(evento)
+
+    lote.venda()
+    assert evento.lotes[0].quant_vendida == 3
+
+    historico.desfazer(evento)
+
+    assert evento.lotes[0].quant_vendida == 2
+
+
+def test_gof_memento_bloqueia_restauracao_em_evento_encerrado_ou_id_divergente():
+    evento = criar_evento()
+    historico = HistoricoEvento()
+    historico.salvar(evento)
+
+    outro_evento = Evento(
+        identificador=99,
+        nome="Outro Evento",
+        data=date(2026, 11, 15),
+        local="Rio",
+        status=StatusEvento.PLANEJADO,
+    )
+    with pytest.raises(OperacaoInvalidaError, match="memento nao pertence a este evento"):
+        historico.desfazer(outro_evento)
+
+    evento.iniciar()
+    evento.encerrar(inscricoes_pendentes=0)
+    with pytest.raises(
+        OperacaoInvalidaError,
+        match="nao e possivel restaurar estado de evento ja encerrado",
+    ):
+        historico.desfazer(evento)
+
+    assert historico.quantidade_estados == 1
+
+
+def test_gof_memento_historico_vazio_rejeita_desfazer():
+    evento = criar_evento()
+    historico = HistoricoEvento()
+
+    with pytest.raises(OperacaoInvalidaError, match="nao ha estado anterior para restaurar"):
+        historico.desfazer(evento)
+
