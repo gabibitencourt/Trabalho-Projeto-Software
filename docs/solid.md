@@ -267,3 +267,75 @@ Com isso, `Evento.alterar_lote` fica **fechado para modificação** e **aberto p
 
 - **Custo:** adição de uma classe abstrata (`RegraAlteracaoLote`), duas classes concretas de regra e uma camada de indireção na leitura do fluxo de `alterar_lote`, além de um parâmetro opcional no construtor de `Evento`.
 - **Por que compensa:** protege a invariante de capacidade vendida do agregado `Evento`, isola cada regra de negócio em uma classe coesa e testável de forma independente e permite adicionar ou combinar novas políticas de alteração de lotes sem tocar no código da entidade `Evento` nem no mapeamento ORM.
+
+## Refatoração — Lucas Paixao de Lima Costa (@LucasLimmm2000)
+
+- **Agregado / Módulo:** Pagamento (camada de serviço e entrypoint Flask)
+- **Princípio Violado:** DIP (Dependency Inversion Principle — Princípio da Inversão de Dependência)
+- **Commit "antes":** `5496cf8`
+- **Commit "depois":** _(preencher após o commit)_
+
+### 1. Problema
+
+Os casos de uso de pagamento (`registrar_pagamento`, `aprovar_pagamento`, `recusar_pagamento`, `estornar_pagamento` e `confirmar_inscricao_apos_pagamento`) não confirmavam a própria transação. Era a rota Flask que fazia isso, chamando `session.commit()` direto na sessão do SQLAlchemy depois de cada chamada ao serviço. O caso de uso dependia de um detalhe concreto de infraestrutura (a `Session`) que nem conhecia, e essa dependência estava no lugar errado — na rota, não no serviço.
+
+Isso é a mesma violação que o Samuel já tinha corrigido no agregado Inscrição; aqui ela se repetia de forma independente no agregado Pagamento, que é a minha responsabilidade.
+
+Na prática, isso trazia os mesmos dois problemas do caso do Samuel:
+- Os testes unitários com `FakePagamentoRepository` não conseguiam verificar se o caso de uso salvava ou não, porque o commit só acontecia na rota (só os testes e2e passavam por ele).
+- Qualquer outro ponto de entrada que chamasse esses serviços sem passar pela rota Flask teria que lembrar de chamar `session.commit()` por fora.
+
+### 2. Trecho de Código Antes
+
+```python
+# services.py
+def aprovar_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = obter_pagamento(identificador, repositorio_pagamento)
+    pagamento.aprovar()
+    repositorio_pagamento.atualizar(pagamento)
+    return pagamento
+
+# flask_app.py
+@app.post("/pagamentos/<int:identificador>/aprovar")
+def aprovar_pagamento(identificador):
+    pagamento = services.aprovar_pagamento(identificador, repositorio_pagamento)
+    session.commit()
+    return jsonify(_serializar_pagamento(pagamento))
+```
+
+### 3. Refatoração
+
+Adicionei o método abstrato `commit()` em `AbstractPagamentoRepository`. O `SqlAlchemyPagamentoRepository` implementa chamando `self.session.commit()`, e o `FakePagamentoRepository` só marca `commitou = True`. Os cinco serviços de pagamento passaram a chamar `repositorio_pagamento.commit()` (ou `repositorio_inscricao.commit()`, no caso de `confirmar_inscricao_apos_pagamento`, que atualiza o agregado Inscrição) no final, e as rotas `/pagamentos`, `/aprovar`, `/recusar`, `/estornar` e `/confirmar-inscricao` não chamam mais `session.commit()`.
+
+```python
+# services.py
+def aprovar_pagamento(identificador: int, repositorio_pagamento):
+    pagamento = obter_pagamento(identificador, repositorio_pagamento)
+    pagamento.aprovar()
+    repositorio_pagamento.atualizar(pagamento)
+    repositorio_pagamento.commit()
+    return pagamento
+
+# flask_app.py
+@app.post("/pagamentos/<int:identificador>/aprovar")
+def aprovar_pagamento(identificador):
+    pagamento = services.aprovar_pagamento(identificador, repositorio_pagamento)
+    return jsonify(_serializar_pagamento(pagamento))
+```
+
+Agora o serviço depende só da abstração (`AbstractPagamentoRepository` / `AbstractInscricaoRepository`), e não da `Session` do SQLAlchemy.
+
+### 4. Como os testes garantiram que o comportamento não mudou
+
+- Os testes e2e de `tests/e2e/test_flask_pagamento.py` continuaram passando sem nenhuma alteração.
+- Os testes do domínio (`tests/unit/test_pagamento.py`) e de integração (`tests/integration/test_repository_pagamento.py`) também passaram sem mudança.
+- Adicionei 4 novos casos em `tests/unit/test_services_pagamento.py`, que usam o `FakePagamentoRepository`/`FakeInscricaoRepository` e verificam que cada caso de uso faz o commit (`repositorio.commitou is True`): `registrar_pagamento`, `aprovar_pagamento`, `recusar_pagamento`/`estornar_pagamento` e `confirmar_inscricao_apos_pagamento`. Antes disso não dava para testar sem banco.
+- Resultado: suíte completa passando (ver `DECISIONS.md` para a contagem final após o commit).
+
+### 5. Custo da refatoração
+
+- Mais um método na interface do repositório, que todas as implementações precisam ter — o mesmo custo que o Samuel já tinha pago para `AbstractInscricaoRepository`.
+- O repositório passa a ter uma responsabilidade a mais (confirmar a transação). O certo seria uma Unit of Work única compartilhada entre os agregados, como propõe o ADR-004 do Samuel; optei por manter o escopo pequeno e restrito ao meu módulo (Pagamento), sem mexer no código de outros agregados.
+- Em `confirmar_inscricao_apos_pagamento`, que cruza os agregados Pagamento → Inscrição, cada repositório comita a própria transação separadamente — não existe uma transação atômica cobrindo os dois agregados juntos. Essa é uma simplificação consciente: sem Unit of Work, não há como garantir atomicidade entre dois repositórios diferentes.
+
+Compensa porque o caso de uso de pagamento fica completo por si só (não depende da rota lembrar de salvar), dá para testar o commit sem banco, e segue o mesmo padrão já adotado no resto do time para o agregado Inscrição.
