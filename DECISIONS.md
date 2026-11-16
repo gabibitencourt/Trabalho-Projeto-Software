@@ -113,10 +113,17 @@ usei para esclarecer conceitos de sobre a camada de serviço
 
 #### Checkpoint 3 (10/11/2026) - Padrões GoF
 - **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py` (`Evento.criar_memento`, `Evento.restaurar`, `EventoMemento`, `_InstantaneoLote` e `HistoricoEvento`), `tests/unit/test_evento.py`, `docs/gof.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** b9c4904d833
+- **Intervalo/Hashes de Commits:** b9c4904d833, 0fe4e20
 - **O que implementei:** Aplicação do padrão GoF comportamental **Memento** no agregado `Evento`, permitindo salvar instantâneos imutáveis (`EventoMemento`) do estado do evento e do seu catálogo de lotes (`_InstantaneoLote`) e restaurá-los por meio do *Caretaker* `HistoricoEvento` (`salvar` e `desfazer`), além de 4 testes unitários em `tests/unit/test_evento.py` e documentação com diagrama de classes em `docs/gof.md`.
 - **Justificativa de decisão de projeto:** Optei por serializar os atributos de cada `LoteDeIngresso` em `_InstantaneoLote` (imutável com `frozen=True`) e atualizar `self._lotes[:] = ...` *in-place* na restauração para garantir tanto o isolamento contra mutações posteriores nos lotes (`lote.venda()`) quanto a preservação da `InstrumentedList` do mapeamento clássico do SQLAlchemy (`map_imperatively`), bloqueando ainda a restauração caso o evento já esteja `ENCERRADO`.
 - **Uso de IA Generativa (conforme Seção 2):** Utilização de assistente de IA para avaliação de qual padrão GoF ainda não utilizado pelo grupo que melhor resolvia o problema de reversão de estado no agregado `Evento` e diagrama Mermaid em `docs/gof.md`.
+
+#### Entrega Final (17/11/2026) - Frameworks
+- **Arquivos sob minha responsabilidade:** `docs/frameworks.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** `<hash-do-commit>`
+- **O que implementei:** Elaboração da análise arquitetural dos frameworks utilizados no sistema (`Flask`, `SQLAlchemy` e `pytest`) em `docs/frameworks.md`, cobrindo o papel de cada um por camada e a independência do domínio `Evento`, três pontos concretos de Inversão de Controle (despacho de rotas/errorhandlers em `flask_app.py`, ciclo de fixtures com `yield` em `test_repository_evento.py`/`test_eventos_api.py` e reconstrução via `map_imperatively` em `orm.py`), quatro padrões de projeto usados internamente pelos frameworks (Data Mapper + Proxy/`InstrumentedList`, Unit of Work + Identity Map na `Session`, Factory em `sessionmaker`/`create_app` e Front Controller/Registry no Flask) e a análise comparativa com o Django (Active Record).
+- **Justificativa de decisão de projeto:** A análise foi ancorada diretamente nos módulos sob minha responsabilidade no agregado `Evento` (`model.py`, `orm.py`, `repository.py`, `services.py`, `flask_app.py` e suítes de teste de `Evento`), evidenciando como o mapeamento imperativo do SQLAlchemy permitiu evoluir o domínio na Fase 2 (regras OCP `RegraAlteracaoLote` e padrão GoF `EventoMemento`) sem acoplar `Evento` ao ORM.
+- **Uso de IA Generativa (conforme Seção 2):** Utilização de assistente de IA para organização da estrutura do documento `docs/frameworks.md`, mapeamento dos padrões internos do SQLAlchemy/Flask/pytest no código do agregado `Evento` e revisão textual, com validação final do autor.
 ---
 
 ### Felipe Gomes de Mello (@FelipeGMello)
