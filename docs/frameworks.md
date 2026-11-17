@@ -120,3 +120,71 @@ Caso o sistema tivesse sido desenvolvido com **Django** em vez de Flask + SQLAlc
 - **Acoplamento da entidade `Participante` ao banco de dados (Active Record):** `Participante` deixaria de ser uma classe Python pura em `src/eventos/domain/model.py` e herdaria de `django.db.models.Model`, declarando campos acoplados ao ORM (`models.CharField`, `models.EmailField`). As validações hoje isoladas nos Value Objects `Documento` e `Email` tenderiam a migrar para métodos `clean()` do modelo ou para `Django Forms / Serializers`.
 - **Dificuldade para aplicar o padrão GoF Decorator sem poluir o banco:** Na arquitetura atual, `ParticipanteVIPDecorator` e `ParticipanteEstudanteDecorator` envolvem um `Participante` em memória para calcular descontos (`obter_desconto_ingresso`) e formatar credenciais (`obter_tipo_credencial`) sem exigir colunas extras no banco. No Django, como a entidade representa diretamente uma linha da tabela, a tendência natural seria adicionar campos booleanos (`is_vip`, `is_estudante`) no modelo `Model` (gerando migrações de banco e ferindo o SRP) ou recorrer a herança de modelos (`Multi-table inheritance`), aumentando a rigidez e as junções SQL.
 - **Impacto na velocidade e no isolamento dos testes unitários:** Os 15 testes de `tests/unit/test_participante.py` hoje rodam em frações de segundo sem inicializar banco de dados ou servidor. No Django, qualquer teste que instancie ou salve um `Participante` herdando de `models.Model` dependeria do ambiente de testes do framework (`django.test.TestCase`) e da criação de tabelas de teste.
+
+---
+
+## Análise — Felipe Gomes de Mello
+
+- **Agregado / Módulo:** `LoteDeIngresso` (classe `LoteDeIngresso`, interface `EstrategiaPreco` e estratégias `PrecoIntegral` e `DescontoPercentual` em `src/eventos/domain/model.py`; mapeamento da tabela `lotes` em `src/eventos/adapters/orm.py`; `AbstractLoteDeIngressoRepository` e `SqlAlchemyLoteDeIngressoRepository` em `src/eventos/adapters/repository.py`; serviços `criar_lote_ingresso` e `obter_lote` em `src/eventos/service_layer/services.py`; rotas `/lotes` e `/lote/<int:identificador>` em `src/eventos/entrypoints/flask_app.py`; teste de Strategy em `tests/unit/test_ingresso.py`; descrição do padrão em `docs/gof.md`).
+
+### 1. Papel de cada framework no módulo de `LoteDeIngresso` e independência do domínio
+
+No módulo do lote, Flask e SQLAlchemy são usados nas camadas externas e pytest na camada de testes. O cálculo de preço por Strategy permanece em classes Python puras:
+
+- **Flask (`src/eventos/entrypoints/flask_app.py`):**
+  - **Papel e camada:** Atua na camada de entrada (*Entrypoints*). A rota `POST /lotes` extrai os dados da requisição JSON, chama `services.criar_lote_ingresso`, confirma a sessão e serializa o lote. A rota `GET /lote/<int:identificador>` delega a busca ao serviço e retorna os dados serializados.
+  - **Por que o domínio não depende dele:** `LoteDeIngresso`, `EstrategiaPreco`, `PrecoIntegral` e `DescontoPercentual` não importam Flask nem conhecem `request`, `jsonify` ou códigos HTTP. A entidade aplica suas invariantes e delega o cálculo de preço à Strategy recebida; cabe à camada de entrada traduzir os dados e apresentar o resultado.
+
+- **SQLAlchemy (`src/eventos/adapters/orm.py` e `src/eventos/adapters/repository.py`):**
+  - **Papel e camada:** Atua na camada de adaptadores (*Adapters*). `orm.py` declara a tabela `lotes` e mapeia imperativamente `LoteDeIngresso` com `mapper_registry.map_imperatively`. O `SqlAlchemyLoteDeIngressoRepository` usa a `Session` para adicionar, consultar, atualizar e remover lotes.
+  - **Por que o domínio não depende dele:** O mapeamento clássico é feito fora da entidade: `LoteDeIngresso` não herda de uma classe do SQLAlchemy nem declara colunas. As estratégias de preço também não precisam ser persistidas; o banco guarda o preço-base e as quantidades, enquanto a política é fornecida ao método `calcular_preco` quando necessário.
+
+- **pytest (`tests/unit/test_ingresso.py`, `tests/conftest.py` e testes de integração/E2E):**
+  - **Papel e camada:** Atua na camada de testes (`tests/`). No teste unitário de Strategy, verifica os cálculos de preço integral e desconto percentual e a rejeição de um percentual fora do intervalo permitido. Fixtures em `conftest.py` e nos testes de integração/E2E preparam sessões, banco em memória e cliente HTTP quando esses recursos são necessários.
+  - **Por que o domínio não depende dele:** O teste instancia diretamente as estratégias e o lote; não é necessário iniciar Flask ou SQLAlchemy para verificar o cálculo. A dependência segue de `tests/` para o código da aplicação, e não do domínio para pytest.
+
+### 2. Pontos de Inversão de Controle (IoC) no código de `LoteDeIngresso`
+
+Uma biblioteca oferece funções ou objetos que o programa chama mantendo o controle do fluxo. Um framework, por sua vez, chama partes do código da aplicação em pontos definidos pelo próprio framework. No módulo do lote, isso aparece em mais de um lugar:
+
+1. **Despacho das rotas pelo Flask (`src/eventos/entrypoints/flask_app.py`):**
+   - As funções `registrar_lote` e `obter_lote` são registradas por `@app.post("/lotes")` e `@app.get("/lote/<int:identificador>")`. A aplicação não as chama diretamente no fluxo normal: o Flask recebe a requisição HTTP, escolhe a rota, converte o identificador da URL e invoca a função correspondente.
+   - Em contraste, `registrar_lote` chama explicitamente `services.criar_lote_ingresso` e o serviço chama os métodos do repositório. Nessas chamadas, nosso código controla a sequência e usa o SQLAlchemy como biblioteca/abstração de persistência.
+
+2. **Descoberta de testes e injeção de fixtures pelo pytest (`tests/unit/test_ingresso.py` e `tests/conftest.py`):**
+   - O pytest descobre automaticamente os testes com nomes reconhecidos, como `teste_lote_calcula_preco_com_estrategias_diferentes`, e os executa. Quando um teste declara uma fixture como parâmetro, o pytest localiza e prepara essa dependência; fixtures que usam `yield` também têm sua etapa de limpeza retomada ao final.
+   - O teste unitário da Strategy não precisa de fixture de banco; já as fixtures de integração e E2E coordenam o ciclo de vida de sessão e cliente sem que cada teste implemente manualmente toda essa inicialização e limpeza.
+
+3. **Materialização de objetos pelo ORM do SQLAlchemy (`src/eventos/adapters/orm.py`):**
+   - Depois de `start_mappers()` registrar o mapeamento, uma consulta como `session.get(LoteDeIngresso, identificador)`, usada pelo repositório, faz o SQLAlchemy reconstruir uma instância a partir dos dados da linha. É o ORM que controla a criação e o preenchimento do objeto durante a leitura; o chamador solicita a consulta e não converte manualmente cada coluna em atributos.
+
+### 3. Padrões de projeto usados internamente pelos frameworks no código de `LoteDeIngresso`
+
+1. **Application Factory e Decorator / registro de rotas no Flask (`src/eventos/entrypoints/flask_app.py`):**
+   - **Onde aparece:** `create_app(session=None)` cria e configura uma instância Flask; os decoradores `@app.post` e `@app.get` registram as funções que tratam as rotas do lote.
+   - **Papel interno:** A fábrica permite criar aplicações configuradas com uma sessão específica, útil nos testes. Os decoradores associam endpoints às funções; o despachante do Flask usa esse registro para encaminhar cada requisição ao handler correspondente. O uso de decoradores aqui é mecanismo do framework para registrar callbacks, não parte da Strategy de preço.
+
+2. **Data Mapper no SQLAlchemy (`src/eventos/adapters/orm.py`):**
+   - **Onde aparece:** `lotes = Table(...)` descreve a tabela e `mapper_registry.map_imperatively(LoteDeIngresso, lotes)` associa essa tabela à classe de domínio.
+   - **Papel interno:** O Data Mapper mantém o mapeamento entre linhas relacionais e objetos fora da entidade. Assim, a estrutura de persistência não precisa ser declarada dentro de `LoteDeIngresso`, preservando a separação entre regras do domínio e banco de dados.
+
+3. **Unit of Work e Identity Map na `Session` do SQLAlchemy (`src/eventos/adapters/repository.py`):**
+   - **Onde aparece:** `SqlAlchemyLoteDeIngressoRepository` executa operações pela mesma `Session` recebida em seu construtor; a rota `POST /lotes` chama `session.commit()` depois de criar o lote.
+   - **Papel interno:** A sessão acompanha objetos carregados e alterações pendentes (Unit of Work) até a confirmação da transação. Seu Identity Map mantém a identidade das instâncias carregadas na sessão, evitando instâncias duplicadas para a mesma identidade durante esse ciclo. O repositório não implementa manualmente esse rastreamento.
+
+4. **Decorator e injeção de dependências de teste no pytest (`tests/conftest.py` e `tests/e2e/test_criar_lote.py`):**
+   - **Onde aparece:** `@pytest.fixture` decora as funções que preparam recursos, como banco em memória e cliente Flask; o pytest injeta esses recursos nos testes que os declaram como parâmetros.
+   - **Papel interno:** O decorador registra a função como fixture, e o mecanismo de resolução de dependências do pytest cuida da preparação e do encerramento dos recursos. Isso evita que os testes precisem chamar essas funções de infraestrutura manualmente.
+
+5. **Strategy no domínio, sem dependência de framework (`src/eventos/domain/model.py` e `tests/unit/test_ingresso.py`):**
+   - **Onde aparece:** `LoteDeIngresso.calcular_preco` delega a `EstrategiaPreco`; `PrecoIntegral` e `DescontoPercentual` implementam o contrato, exercitado pelo teste unitário.
+   - **Papel interno:** Esse é o padrão GoF solicitado para o lote, implementado pelo próprio domínio e não fornecido por Flask, SQLAlchemy ou pytest. A separação deixa políticas de preço substituíveis sem adicionar dependências de framework à entidade.
+
+### 4. O que mudaria no módulo de `LoteDeIngresso` com um framework full-stack como o Django
+
+Se o módulo fosse implementado com Django em vez de Flask + SQLAlchemy:
+
+- **Entrada HTTP:** As rotas registradas no Flask seriam substituídas pela configuração de URLs e *views* do Django. A extração do JSON e a serialização das respostas teriam de ser implementadas nas views ou com uma solução adicional para API, como Django REST Framework; Django, por si só, não implica o uso dessa extensão.
+- **Persistência e acoplamento:** A opção mais direta seria transformar `LoteDeIngresso` em `django.db.models.Model`, declarar campos como `preco` e `quant_total` e usar os managers do ORM, reduzindo a necessidade do mapeamento imperativo e do repositório SQLAlchemy atual. Se o modelo de domínio continuasse puro, seria possível manter esse desacoplamento, mas seria necessário separar o modelo Django de persistência da entidade e fazer a tradução entre eles.
+- **Strategy de preço:** `EstrategiaPreco`, `PrecoIntegral` e `DescontoPercentual` poderiam continuar como classes Python comuns. As views ou serviços do Django escolheriam a estratégia e a passariam para `LoteDeIngresso.calcular_preco`; o algoritmo não precisa depender do framework.
+- **Migrações e testes:** O esquema e as mudanças de campos passariam a ser gerenciados pelas migrações do Django. Testes de integração usariam a configuração de testes e o banco de teste do framework. Testes puros das estratégias ainda poderiam continuar isolados, sem banco, desde que as políticas permanecessem separadas dos modelos Django.

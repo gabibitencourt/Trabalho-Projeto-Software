@@ -161,6 +161,35 @@ Nenhuma.
 - **Justificativa de decisão de projeto:** Segui o padrão de Service Layer para isolar os casos de uso das regras da API. Dessa forma, a lógica de orquestração do pagamento (validar a inscrição e aplicar a transação) não se acopla ao Flask, permitindo a execução rápida e confiável dos testes unitários antes da entrega das rotas.
 - **Uso de IA Generativa:** A IA foi utilizada como assistente de codificação para agilizar a criação dos testes unitários em Pytest, formatar a estrutura das funções de serviço com injeção de dependência e auxiliar na resolução de problemas de configuração e execução do ambiente virtual no terminal PowerShell.
 
+#### Checkpoint 1 (22/10/2026) - Arquitetura e ADR
+- **Arquivos sob minha responsabilidade:** `docs/arquitetura.md`, `docs/adr/adr.md` (arquivo criado no commit inicial) e `docs/adr/001-validar-dados-dominio.md` (alteração posterior).
+- **Intervalo/Hashes de Commits:** `47a6fed6e81866d7370ef92c144a92bab1202425`, `60d936b3d29367eb1ca82d3a2e76867294f9b3a2`
+- **O que implementei:** Registrei requisitos e atributos de qualidade na arquitetura e elaborei/ajustei documentação ADR, incluindo a decisão de manter validações de dados no domínio em vez de depender somente da API.
+- **Justificativa de decisão de projeto:** Mantive as regras de validação no domínio para que todos os caminhos de criação protejam as invariantes, sem acoplar as entidades ao Flask.
+- **Uso de IA Generativa:** Usei IA para auxiliar na escrita da documentação e depurar o código.
+
+#### Checkpoint 2 (03/11/2026) - Refatoração SOLID
+- **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py` e `docs/solid.md`.
+- **Intervalo/Hashes de Commits:** `bfb9d1db22801bdb0636804b1847ef6a0420c9c7`, `9923b9c9dfa1022c911e3ac8da47e97eb1eeebec`
+- **O que implementei:** Extraí de `Evento` as regras de transição do ciclo de vida para `_CicloDeVidaEvento` e documentei a refatoração. Os testes existentes de `Evento` foram usados para verificar que as transições e restrições continuaram funcionando.
+- **Justificativa de decisão de projeto:** Concentrei as decisões de transição em uma política interna para separar responsabilidades, preservar a interface de `Evento` e manter o mapeamento ORM inalterado.
+- **Uso de IA Generativa:** Usei IA para auxiliar na documentação e depurar o código.
+
+#### Checkpoint 3 (10/11/2026) - Padrão GoF Strategy
+- **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py`, `tests/unit/test_ingresso.py` e `docs/gof.md`.
+- **Intervalo/Hashes de Commits:** `30bd82af9737efd3f1d7586b79277118b839d76f`
+- **O que implementei:** Apliquei Strategy ao cálculo do preço do `LoteDeIngresso`, com `EstrategiaPreco`, `PrecoIntegral` e `DescontoPercentual`, e documentei os participantes, o diagrama, as alternativas e o custo. Os testes unitários verificam preço integral, desconto e percentual inválido.
+- **Justificativa de decisão de projeto:** Escolhi Strategy para variar a política de preço sem acrescentar condicionais ao lote, mantendo o cálculo independente de Flask e SQLAlchemy.
+- **Uso de IA Generativa:** Usei IA para apoiar a implementação da Strategy, os testes e a documentação; revisei o resultado e validei a suíte de testes.
+
+#### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
+- **Arquivos sob minha responsabilidade:** `docs/frameworks.md`, `docs/retrospectiva.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** 
+- **O que implementei:** Registrei a análise de Flask, SQLAlchemy e pytest aplicada ao agregado `LoteDeIngresso`, incluindo IoC, padrões usados pelos frameworks e comparação com Django. Elaborei a retrospectiva da Fase 2 e este autorrelato.
+- **Justificativa de decisão de projeto:** Recomendei manter uma arquitetura híbrida, preservando o domínio puro e aplicando abstrações quando seus benefícios justificam o custo.
+- **Uso de IA Generativa:** Usei IA para estruturar e revisar os documentos.
+- **Reflexão final (150–300 palavras):** Na Fase 2, aprendi que separar o domínio da infraestrutura não basta por si só: o benefício aparece quando contratos entre camadas e testes deixam claro quem decide regras e quem coordena persistência. A refatoração de `Evento` mostrou que extrair políticas pode manter a entidade aberta a extensões, mas adiciona classes e indireção. A Strategy no `LoteDeIngresso` também deixa políticas de preço testáveis sem Flask ou SQLAlchemy; ao mesmo tempo, percebi que o cálculo ainda não está integrado a um caso de uso ou endpoint, então a extensão não muda a experiência real do sistema. Essa diferença entre “padrão demonstrado” e “funcionalidade integrada” foi uma lição importante. Eu manteria o domínio puro e o mapeamento clássico enquanto trouxerem testabilidade e flexibilidade, mas evitaria abstrações sem mais de uma política ou caso de uso que as justifique. Se recomeçasse, definiria desde o início os critérios de aceite de ponta a ponta e os chamadores das estratégias, além dos testes unitários. Também registraria decisões, limitações e hashes junto de cada checkpoint, para facilitar rastreabilidade e reflexão sem reconstruir o histórico no fim. Para problemas transacionais, priorizaria primeiro uma Unit of Work; só depois avaliaria eventos, evitando adicionar indireção antes de resolver a consistência.
+
 ---
 
 ### João Marcello da Costa (@JoaoMarcelloCosta2000)
