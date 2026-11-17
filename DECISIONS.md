@@ -54,7 +54,7 @@ Este documento registra as contribuições individuais e as decisões de projeto
 
 #### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
 - **Arquivos sob minha responsabilidade:** `docs/frameworks.md`, `docs/retrospectiva.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:**
+- **Intervalo/Hashes de Commits:** a193c7ca245c4fbffc4389af5c0b00bf367411c5, 141e3fdb03b1a87bc6f22a80d65cda5d3ae65941
 - **O que implementei:** Elaboração da análise individual dos frameworks (Flask, SQLAlchemy e pytest) aplicada ao escopo de `Participante` em `docs/frameworks.md`, redação da retrospectiva arquitetural da Fase 2 em `docs/retrospectiva.md` e registro do autorrelato final com reflexão no `DECISIONS.md`.
 - **Justificativa de decisão de projeto:** Optamos por recomendar uma arquitetura híbrida na retrospectiva porque a Fase 2 evidenciou que o isolamento do domínio favorece refatorações SOLID e padrões GoF, mas o excesso de camadas e repositórios falsos gera custo desnecessário em fluxos puramente cadastrais.
 - **Uso de IA Generativa:** Utilização de assistente de IA para revisão estrutural dos tópicos exigidos no roteiro da Fase 2, organização dos argumentos técnicos da retrospectiva.
