@@ -212,11 +212,40 @@ Nenhuma.
 - **Simplificações conscientes:** Uso do SQLite em memória nos testes de integração para evitar dependência de servidor de banco de dados externo.
 
 #### Entrega da Fase 1 (Semana 4) - Serviço e API
-- **Arquivos sob minha responsabilidade:** 
-- **Intervalo/Hashes de Commits:** 
-- **O que implementei:**
-- **Justificativa de decisão de projeto:**
-- **Uso de IA Generativa:**
+- **Arquivos sob minha responsabilidade:** `src/eventos/service_layer/services.py`, `src/eventos/entrypoints/flask_app.py`, `tests/unit/test_services_pagamento.py` e `tests/e2e/test_flask_pagamento.py`
+- **Intervalo/Hashes de Commits:** `7ef19bf`, `30181fe`
+- **O que implementei:** Casos de uso da camada de serviço do agregado `Pagamento` (`registrar_pagamento`, `obter_pagamento`, `aprovar_pagamento`), endpoints REST no Flask (`POST /pagamentos`, `GET /pagamentos/<id>`, `POST /pagamentos/<id>/aprovar`), testes unitários com repositórios dublês (`FakePagamentoRepository` e `FakeInscricaoRepository`) e testes E2E da API de pagamentos.
+- **Justificativa de decisão de projeto:** Isolamento das regras de orquestração financeira na camada de serviço por meio de injeção de dependência dos repositórios abstratos, mantendo os endpoints HTTP restritos à validação de entrada, controle de transação e serialização JSON.
+- **Uso de IA Generativa:** Apoio na estruturação dos casos de teste unitários/E2E com pytest, injeção de dependências nos serviços e resolução de conflitos de merge.
+
+#### Checkpoint 1 (22/10/2026) - Arquitetura e ADR-003
+- **Arquivos sob minha responsabilidade:** `docs/arquitetura.md`, `docs/adr/003-desacoplamento-pagamento-service-layer.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** `68fe4d2`
+- **O que implementei:** Documentação da análise de trade-offs na arquitetura em camadas e elaboração do ADR-003 registrando o desacoplamento entre o agregado `Pagamento`, a camada de serviço e a persistência via interfaces de repositório.
+- **Justificativa de decisão de projeto:** Formalizar o contrato entre `services.py` e `AbstractPagamentoRepository` evita que regras de transição financeira dependam da `Session` do SQLAlchemy ou das rotas Flask.
+- **Uso de IA Generativa (conforme Seção 2.5):** Apoio na revisão estrutural do ADR e padronização com os demais documentos do grupo.
+
+#### Checkpoint 2 (03/11/2026) - Refatoração SOLID
+- **Arquivos sob minha responsabilidade:** `src/eventos/service_layer/services.py`, `src/eventos/adapters/repository.py`, `tests/unit/test_services_pagamento.py`, `docs/solid.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** refatoração aplicada no escopo da Fase 2
+- **O que implementei:** Refatoração aplicando SRP e DIP nos casos de uso de pagamento (`registrar_pagamento`, `aprovar_pagamento`), garantindo que a orquestração dependa apenas das interfaces `AbstractPagamentoRepository` e `AbstractInscricaoRepository`, e documentação da refatoração em `docs/solid.md`.
+- **Justificativa de decisão de projeto:** Garantir o desacoplamento entre a camada de aplicação e os detalhes de persistência do SQLAlchemy, facilitando testes unitários isolados e a evolução independente do modelo de domínio.
+- **Uso de IA Generativa (conforme Seção 2.5):** Auxílio na análise de acoplamento e formatação da documentação em `docs/solid.md`.
+
+#### Checkpoint 3 (10/11/2026) - Padrão GoF Observer
+- **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py` (`ObservadorPagamento`, `InscricaoSyncObserver`, `AuditoriaPagamentoObserver`, `NotificacaoPagamentoObserver` e sujeito `Pagamento`), `tests/unit/test_pagamento_observer.py`, `docs/gof.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** `16835b1`, `061c847`
+- **O que implementei:** Implementação do padrão GoF comportamental **Observer** no agregado `Pagamento` para notificar automaticamente a sincronização de status da `Inscricao` (`InscricaoSyncObserver`), o registro de auditoria contábil (`AuditoriaPagamentoObserver`) e o envio de recibo ao participante (`NotificacaoPagamentoObserver`) sem acoplar `Pagamento` a subsistemas externos.
+- **Justificativa de decisão de projeto:** Permite adicionar novas reações a eventos financeiros (aprovação, recusa, estorno) criando novos observadores sem modificar `Pagamento` nem violar o SRP, mantendo compatibilidade total com o padrão State e com o mapeamento imperativo do SQLAlchemy.
+- **Uso de IA Generativa (conforme Seção 2.5):** Apoio na modelagem das interfaces do Observer, criação dos testes unitários e diagramação Mermaid no `docs/gof.md`.
+
+#### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
+- **Arquivos sob minha responsabilidade:** `docs/frameworks.md`, `docs/retrospectiva.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** commit atual
+- **O que implementei:** Análise detalhada de Flask, SQLAlchemy e pytest aplicada aos módulos de `Pagamento` e `CheckIn`/`Inscricao` em `docs/frameworks.md` (incluindo pontos de IoC, padrões internos dos frameworks e comparação com Django), retrospectiva arquitetural da Fase 2 em `docs/retrospectiva.md` e autorrelato final no `DECISIONS.md`.
+- **Justificativa de decisão de projeto:** Recomendei uma arquitetura híbrida na retrospectiva por equilibrar a testabilidade e o isolamento do domínio (essenciais para padrões como State e Observer) com a redução de código repetitivo nas camadas de repositório e controle transacional.
+- **Uso de IA Generativa (conforme Seção 2.5):** Utilização de assistente de IA para organizar os tópicos exigidos no roteiro final, revisar referências a arquivos/commits do repositório e estruturar os textos técnicos.
+- **Reflexão final (150–300 palavras):** Ao longo da Fase 2, o principal aprendizado técnico foi perceber na prática como o isolamento do domínio em Python puro facilita evoluções complexas sem efeitos colaterais na infraestrutura. Quando precisei aplicar refatorações SOLID nos casos de uso de pagamento e, em seguida, introduzir o padrão GoF Observer em `Pagamento` para sincronizar automaticamente a confirmação da `Inscricao`, registrar auditoria e disparar notificações, toda a lógica pôde ser desenvolvida e validada em segundos com testes unitários isolados, sem alterar uma única coluna em `orm.py` ou rota em `flask_app.py`. Por outro lado, conviver com o mapeamento imperativo do SQLAlchemy (`map_imperatively`) mostrou que o desacoplamento nunca é absoluto: como o ORM reconstrói instâncias sem chamar `__init__`, atributos em memória como a lista de observadores exigem cuidados defensivos no domínio e reacoplamento na camada de serviço. Se recomeçasse o projeto, manteria o núcleo de domínio puro e a separação de responsabilidades, mas eliminaria a duplicação de `FakeRepository` para operações simples (usando SQLite em memória nos testes) e implementaria desde o início uma `Unit of Work` centralizada na camada de serviço, evitando gerenciar transações manualmente entre agregados interdependentes como `Pagamento` e `Inscricao`.
 
 ---
 

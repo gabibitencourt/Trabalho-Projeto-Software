@@ -188,3 +188,64 @@ Se o módulo fosse implementado com Django em vez de Flask + SQLAlchemy:
 - **Persistência e acoplamento:** A opção mais direta seria transformar `LoteDeIngresso` em `django.db.models.Model`, declarar campos como `preco` e `quant_total` e usar os managers do ORM, reduzindo a necessidade do mapeamento imperativo e do repositório SQLAlchemy atual. Se o modelo de domínio continuasse puro, seria possível manter esse desacoplamento, mas seria necessário separar o modelo Django de persistência da entidade e fazer a tradução entre eles.
 - **Strategy de preço:** `EstrategiaPreco`, `PrecoIntegral` e `DescontoPercentual` poderiam continuar como classes Python comuns. As views ou serviços do Django escolheriam a estratégia e a passariam para `LoteDeIngresso.calcular_preco`; o algoritmo não precisa depender do framework.
 - **Migrações e testes:** O esquema e as mudanças de campos passariam a ser gerenciados pelas migrações do Django. Testes de integração usariam a configuração de testes e o banco de teste do framework. Testes puros das estratégias ainda poderiam continuar isolados, sem banco, desde que as políticas permanecessem separadas dos modelos Django.
+
+## Análise — João Marcello da Costa (@JoaoMarcelloCosta2000)
+
+- **Agregado / Módulo:** `Pagamento` e `CheckIn` / `Inscricao` (entidades `Pagamento`, `CheckIn`, `Inscricao` e hierarquia `Observer` — `ObservadorPagamento`, `InscricaoSyncObserver`, `AuditoriaPagamentoObserver`, `NotificacaoPagamentoObserver` em `src/eventos/domain/model.py`; mapeamentos das tabelas `pagamentos` e `inscricoes` em `src/eventos/adapters/orm.py`; `AbstractPagamentoRepository`, `FakePagamentoRepository` e `SqlAlchemyPagamentoRepository` em `src/eventos/adapters/repository.py`; casos de uso de pagamento em `src/eventos/service_layer/services.py`; endpoints `/pagamentos` em `src/eventos/entrypoints/flask_app.py`; fixtures e suítes em `tests/conftest.py`, `tests/unit/test_inscricao.py`, `tests/unit/test_pagamento_repository.py`, `tests/unit/test_pagamento_observer.py`, `tests/integration/test_repository_pagamento.py` e `tests/e2e/test_flask_pagamento.py`).
+
+### 1. Papel de cada framework nos módulos de `Pagamento` e `CheckIn` e independência do domínio
+
+Nos módulos sob minha responsabilidade, os frameworks permanecem restritos às camadas externas (`entrypoints/`, `adapters/` e `tests/`), mantendo as invariantes de check-in e as notificações do ciclo de vida financeiro em Python puro:
+
+- **Flask (`src/eventos/entrypoints/flask_app.py`):**
+  - **Papel e camada:** Atua na camada de entrada (*Entrypoints*), expondo as rotas HTTP `POST /pagamentos`, `GET /pagamentos/<int:identificador>` e `POST /pagamentos/<int:identificador>/aprovar` (além de `POST /inscricoes/<int:identificador>/checkin`). Ele extrai o JSON da requisição via `request.get_json()`, invoca os casos de uso em `services.py`, confirma a transação e serializa a resposta com `jsonify`.
+  - **Por que o domínio não depende dele:** As classes `Pagamento`, `CheckIn`, `Inscricao` e os observadores (`ObservadorPagamento` e suas implementações concretas) não possuem nenhum `import flask`. Violações de invariantes (como tentar realizar check-in duplicado ou estornar um pagamento após check-in) disparam exclusivamente `OperacaoInvalidaError` ou `ValueError`, sem acoplamento a `request` ou códigos de status HTTP.
+
+- **SQLAlchemy (`src/eventos/adapters/orm.py` e `src/eventos/adapters/repository.py`):**
+  - **Papel e camada:** Atua na camada de adaptadores (*Adapters*), definindo as tabelas `pagamentos` e `inscricoes` e realizando o mapeamento imperativo (`mapper_registry.map_imperatively(Pagamento, pagamentos, ...)` e `mapper_registry.map_imperatively(Inscricao, inscricoes, ...)`) em `orm.py`, além de implementar `SqlAlchemyPagamentoRepository` (`session.add`, `session.get`, `session.query`, `session.merge`) em `repository.py`.
+  - **Por que o domínio não depende dele:** Como foi utilizado o mapeamento clássico (`map_imperatively`), `Pagamento` não herda de `DeclarativeBase` nem define colunas do ORM. Isso permitiu adicionar a lista em memória `self.observadores` e os métodos `adicionar_observador`, `remover_observador` e `notificar` do padrão GoF **Observer** diretamente em `Pagamento` sem exigir alteração na tabela `pagamentos`.
+
+- **pytest (`tests/conftest.py`, `tests/unit/test_pagamento_observer.py`, `tests/integration/test_repository_pagamento.py` e `tests/e2e/test_flask_pagamento.py`):**
+  - **Papel e camada:** Atua na camada de testes (`tests/`), validando de forma isolada as regras de `CheckIn` (`test_inscricao.py`), o contrato do repositório em memória (`test_pagamento_repository.py`), o disparo de observadores (`test_pagamento_observer.py`), a persistência SQLite (`test_repository_pagamento.py`) e os endpoints HTTP (`test_flask_pagamento.py`).
+  - **Por que o domínio não depende dele:** A dependência é estritamente unidirecional (`tests/ -> src/eventos/`). Os testes unitários do `Observer` e do `CheckIn` instanciam entidades diretamente em memória em milissegundos, sem depender do executor de testes ou de banco de dados.
+
+### 2. Pontos de Inversão de Controle (IoC) nos códigos de `Pagamento` e `CheckIn`
+
+Enquanto uma **biblioteca** é invocada diretamente pelo nosso código (por exemplo, `datetime.now()` ao registrar o momento do `CheckIn` ou chamadas explícitas a `session.get(...)` dentro de `SqlAlchemyPagamentoRepository`, onde o nosso código retém o fluxo), um **framework** aplica **Inversão de Controle (IoC)**: o framework detém o loop principal e **chama o código da aplicação** em pontos pré-definidos:
+
+1. **Despacho de rotas e conversão de exceções de domínio no Flask (`src/eventos/entrypoints/flask_app.py`):**
+   - Os endpoints `registrar_pagamento`, `obter_pagamento` e `aprovar_pagamento` são registrados pelos decoradores `@app.post("/pagamentos")`, `@app.get("/pagamentos/<int:identificador>")` e `@app.post("/pagamentos/<int:identificador>/aprovar")`.
+   - O código da equipe nunca invoca essas funções diretamente: o servidor WSGI/Flask recebe a requisição HTTP, converte `<int:identificador>` e chama a função registrada; caso `Pagamento.aprovar()` ou `Inscricao.realizar_checkin()` levante `OperacaoInvalidaError`, o Flask intercepta a exceção e chama automaticamente o handler registrado com `@app.errorhandler(OperacaoInvalidaError)` para retornar HTTP `400`.
+
+2. **Injeção de fixtures com ciclo `setup/teardown` no pytest (`tests/conftest.py` e `tests/integration/test_repository_pagamento.py`):**
+   - Em `tests/conftest.py` e `tests/integration/test_repository_pagamento.py`, fixtures marcadas com `@pytest.fixture` preparam o motor SQLite em memória, executam `start_mappers()`, fornecem a `session` ou o `SqlAlchemyPagamentoRepository` via `yield` e, no bloco `finally`, encerram a sessão e chamam `clear_mappers()`.
+   - O pytest inspeciona os parâmetros de cada função `test_*`, invoca as fixtures necessárias antes do teste, injeta os objetos retornados e retoma o código após o `yield` ao final da execução.
+
+3. **Materialização de `Pagamento` e resolução de relacionamentos pelo SQLAlchemy (`src/eventos/adapters/orm.py`):**
+   - Ao executar `mapper_registry.map_imperatively(Pagamento, pagamentos, properties={"inscricao": relationship(Inscricao)})` em `start_mappers()`, o SQLAlchemy assume o controle da reconstrução de instâncias nas consultas ao banco: ao buscar um pagamento no SQLite, o ORM instancia `Pagamento` sem passar por `Pagamento.__init__` e preenche `identificador`, `valor`, `status` e o relacionamento `inscricao` automaticamente.
+
+### 3. Padrões de projeto usados internamente pelos frameworks nos módulos de `Pagamento` e `CheckIn`
+
+1. **Data Mapper (`mapper_registry.map_imperatively` em `src/eventos/adapters/orm.py`):**
+   - **Onde aparece:** nas definições das tabelas `inscricoes` (linhas 54–62) e `pagamentos` (linhas 64–71) e nas chamadas a `mapper_registry.map_imperatively` (linhas 82–89 e 103–109) de `orm.py`.
+   - **Papel interno:** Media a transferência de dados entre os objetos de domínio (`Pagamento`, `Inscricao`) e as tabelas relacionais. Esse desacoplamento permitiu mapear o check-in como uma coluna `DateTime` (`Column("checkin_data_hora", DateTime, key="_checkin_data_hora", nullable=True)`) enquanto o domínio modela o objeto rico `CheckIn`, e permitiu anexar observadores em memória (`self.observadores`) em `Pagamento` sem impactar a persistência.
+
+2. **Unit of Work e Identity Map na `Session` do SQLAlchemy (`src/eventos/adapters/repository.py` e `tests/integration/test_repository_pagamento.py`):**
+   - **Onde aparece:** nos métodos `adicionar`, `obter`, `listar_por_inscricao` e `atualizar` de `SqlAlchemyPagamentoRepository` (`repository.py`) e nas chamadas a `session.commit()` e `session.expire_all()` nos testes de integração (`test_repository_pagamento.py`).
+   - **Papel interno:** A `Session` atua como **Unit of Work**, rastreando modificações nos objetos carregados (como a mudança de `status` de `Pagamento` e `Inscricao`) e descarregando os comandos SQL em uma única transação atômica no `commit()`. Simultaneamente, seu **Identity Map** garante que múltiplas leituras do mesmo `identificador` dentro da mesma sessão retornem a mesma instância em memória.
+
+3. **Application Factory e Decorator de roteamento no Flask (`src/eventos/entrypoints/flask_app.py` e `tests/e2e/test_flask_pagamento.py`):**
+   - **Onde aparece:** na função `create_app(session=None)` em `flask_app.py` (usada na fixture de `test_flask_pagamento.py`) e nos decoradores `@app.post`, `@app.get` e `@app.errorhandler`.
+   - **Papel interno:** `create_app` implementa o padrão **Application Factory**, permitindo instanciar aplicações Flask isoladas injetando uma sessão SQLite em memória por teste E2E. Já os decoradores de rota e erro registram callbacks no despachante interno do Flask sem alterar o corpo das funções de borda.
+
+4. **Observer no domínio vs. infraestrutura (`src/eventos/domain/model.py` e `tests/unit/test_pagamento_observer.py`):**
+   - **Onde aparece:** na interface `ObservadorPagamento` e nos observadores concretos `InscricaoSyncObserver`, `AuditoriaPagamentoObserver` e `NotificacaoPagamentoObserver` acoplados a `Pagamento`.
+   - **Papel interno:** Diferentemente dos padrões internos fornecidos pelos frameworks acima, este padrão foi implementado diretamente no domínio puro para desacoplar reações pós-transação (confirmação automática da inscrição, auditoria e notificação) sem depender de sinais do SQLAlchemy ou hooks do Flask.
+
+### 4. O que mudaria nos módulos de `Pagamento` e `CheckIn` com um framework full-stack como o Django
+
+Se o sistema tivesse sido construído com **Django** em vez de Flask + SQLAlchemy:
+
+- **Migração de Data Mapper para Active Record (`models.Model`):** `Pagamento` e `Inscricao` herdariam de `django.db.models.Model`, declarando campos diretamente nas entidades (`models.ForeignKey(Inscricao, ...)`, `models.FloatField`, `models.CharField`). O objeto de domínio `CheckIn` deixaria de ser uma abstração pura mapeada indiretamente e provavelmente seria absorvido como campos de data/status no próprio modelo `Inscricao` ou em uma tabela filha acoplada ao ORM.
+- **Impacto no padrão Observer e nos efeitos colaterais de pagamento:** Na arquitetura atual, `Pagamento.notificar()` aciona `InscricaoSyncObserver`, `AuditoriaPagamentoObserver` e `NotificacaoPagamentoObserver` em Python puro, sendo testado sem banco em `test_pagamento_observer.py`. No Django, o caminho idiomático seria substituir ou misturar essa lógica com **Django Signals** (`post_save` no modelo `Pagamento`), o que acopla o disparo de eventos à camada de persistência do framework (só dispara ao chamar `.save()`) e torna o fluxo mais implícito e difícil de rastrear.
+- **Substituição dos repositórios e perda de velocidade nos testes unitários:** `AbstractPagamentoRepository`, `FakePagamentoRepository` e `SqlAlchemyPagamentoRepository` seriam substituídos pelo *Manager* padrão do Django (`Pagamento.objects.filter(inscricao_id=...)`). Em contrapartida, os testes rápidos em memória (`test_pagamento_repository.py` e `test_pagamento_observer.py`) passariam a depender do *test runner* do Django (`django.test.TestCase`) e da criação de tabelas SQLite a cada execução.
