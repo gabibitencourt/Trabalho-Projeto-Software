@@ -184,7 +184,7 @@ Nenhuma.
 
 #### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
 - **Arquivos sob minha responsabilidade:** `docs/frameworks.md`, `docs/retrospectiva.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** 
+- **Intervalo/Hashes de Commits:** `b1bfec1d9078267d4c6a0731b733c940edbe091b`
 - **O que implementei:** Registrei a análise de Flask, SQLAlchemy e pytest aplicada ao agregado `LoteDeIngresso`, incluindo IoC, padrões usados pelos frameworks e comparação com Django. Elaborei a retrospectiva da Fase 2 e este autorrelato.
 - **Justificativa de decisão de projeto:** Recomendei manter uma arquitetura híbrida, preservando o domínio puro e aplicando abstrações quando seus benefícios justificam o custo.
 - **Uso de IA Generativa:** Usei IA para estruturar e revisar os documentos.
