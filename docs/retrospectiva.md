@@ -1,3 +1,46 @@
+# Retrospectiva da Arquitetura
+
+Este documento responde se o grupo escolheria novamente a arquitetura adotada no sistema após conviver com ela ao longo da Fase 2, revisitar as previsões do Checkpoint 1 e avaliar o impacto real das camadas durante as refatorações SOLID e a aplicação dos padrões GoF.
+
+---
+
+## Análise — Arthur Siqueira Campos Alexandrino (@devalexandrino)
+
+- **Escopo avaliado:** Agregado `Evento` (`Evento`, `RegraAlteracaoLote`, `RegraNaoReduzirCapacidadeAbaixoDoVendido`, `RegraNaoAlterarPrecoComVendas`, `EventoMemento`, `_InstantaneoLote` e `HistoricoEvento` em `src/eventos/domain/model.py`; `AbstractEventoRepository`, `FakeEventoRepository` e `SqlAlchemyEventoRepository` em `src/eventos/adapters/repository.py`; mapeamento da tabela `eventos` em `src/eventos/adapters/orm.py`; casos de uso `criar_evento` e `encerrar_evento` em `src/eventos/service_layer/services.py`; rotas `/eventos` em `src/eventos/entrypoints/flask_app.py` e suítes de teste em `tests/unit/test_evento.py`, `tests/unit/test_services_evento.py`, `tests/integration/test_repository_evento.py` e `tests/e2e/test_eventos_api.py`).
+
+### 1. Revisitação do Checkpoint 1 e trade-offs na prática
+
+No Checkpoint 1 (commit `03374aa`), defini na seção de **Requisitos arquiteturais** de `docs/arquitetura.md` três atributos de qualidade em ordem de prioridade: **1º Testabilidade**, **2º Integridade e Consistência das Regras de Negócio (Confiabilidade)** e **3º Modificabilidade e Manutenibilidade**, além do **ADR-002** sobre o desacoplamento entre `Evento.encerrar(inscricoes_pendentes)` e o agregado `Inscricao`.
+
+Ao final da Fase 2, o balanço entre essas previsões e a prática foi o seguinte:
+
+- **Previsões que se confirmaram:**
+  - A **Testabilidade** e a **Integridade das Regras de Negócio** no domínio se confirmaram integralmente. Os 22 testes unitários de `tests/unit/test_evento.py` e os 5 testes de serviço em `tests/unit/test_services_evento.py` rodam em memória em milissegundos, sem subir Flask ou SQLite, garantindo que nenhuma transição inválida (iniciar evento encerrado, alterar lote com evento em andamento, reduzir capacidade abaixo do vendido ou encerrar evento com inscrições pendentes) corrompa o estado do agregado.
+  - A decisão registrada no **ADR-002** provou seu valor durante toda a Fase 2: como `Evento.encerrar` recebe apenas a contagem inteira de pendências, pude refatorar e estender `Evento` nos Checkpoints 2 e 3 sem ser afetado pelas mudanças que outros integrantes fizeram em `Inscricao` (Factory Method) ou `Pagamento` (State e Observer).
+
+- **Trade-offs que mais pesaram na prática:**
+  - **Vazamento sutil do mapeamento imperativo (`map_imperatively`) para o design do domínio:** no Checkpoint 1, assumimos que o mapeamento clássico em `orm.py` tornava `domain/model.py` 100% alheio ao SQLAlchemy. Na prática, descobrimos na Fase 2 que o SQLAlchemy reconstrói instâncias de `Evento` vindas do banco **sem chamar `__init__`** e substitui `self._lotes` por uma `InstrumentedList`. Isso exigiu cuidados extras no domínio que só existem por causa do ORM.
+  - **Alto custo de cerimônia (*boilerplate*) e lacunas de integração entre camadas:** enquanto o modelo de domínio evoluía rápido, conectar qualquer contrato entre agregados até a ponta HTTP exigia coordenar `repository.py`, `orm.py`, `services.py` e `flask_app.py`. Um exemplo concreto é que a rota `POST /eventos/<id>/encerrar` permaneceu retornando `501 Not Implemented` no teste E2E (`tests/e2e/test_eventos_api.py`) porque `SqlAlchemyInscricaoRepository` não implementou `listar_por_evento`, e as rotas de `/eventos` em `flask_app.py` continuaram chamando `session.commit()` diretamente por falta de uma *Unit of Work* unificada.
+
+### 2. Evidências da Fase 2: Onde as camadas facilitaram e onde atrapalharam
+
+- **Onde as camadas facilitaram:**
+  1. **Refatoração SOLID (OCP em `Evento.alterar_lote`, commit `a3e8858744`):** para corrigir a violação do Princípio Aberto/Fechado, extraí a abstração `RegraAlteracaoLote` e as regras `RegraNaoReduzirCapacidadeAbaixoDoVendido` e `RegraNaoAlterarPrecoComVendas`. Toda a mudança ficou contida em `src/eventos/domain/model.py` e `tests/unit/test_evento.py`, com **zero linhas alteradas** em `orm.py`, `repository.py`, `services.py` ou `flask_app.py`, confirmando a métrica de modificabilidade prevista no Checkpoint 1.
+  2. **Padrão GoF Memento (`EventoMemento` e `HistoricoEvento`, commits `b9c4904d833` e `0fe4e20`):** foi possível implementar a captura e restauração de instantâneos imutáveis do evento e do seu catálogo de lotes (`_InstantaneoLote`) inteiramente na camada de domínio e validá-la com 4 novos testes unitários em `tests/unit/test_evento.py`, sem precisar alterar o esquema de tabelas em `orm.py`.
+
+- **Onde as camadas e a infraestrutura atrapalharam:**
+  1. **Reconstrução sem `__init__` no ORM (Checkpoint 2):** ao introduzir `_regras_alteracao_lote` na refatoração OCP de `Evento`, não bastou inicializar `self._regras_alteracao_lote` dentro de `Evento.__init__`. Como `SqlAlchemyEventoRepository.obter()` hidrata `Evento` via `map_imperatively` sem executar `__init__`, foi obrigatório definir `_regras_alteracao_lote = (RegraNaoReduzirCapacidadeAbaixoDoVendido(),)` também como atributo de classe em `Evento` (`model.py`, linha 145) para evitar `AttributeError` em instâncias carregadas do banco.
+  2. **Coleção instrumentada (`InstrumentedList`) no Memento (Checkpoint 3):** em `Evento.restaurar(memento)` (`model.py`, linha 243), reatribuir `self._lotes = [...]` sobrescreveria o proxy `InstrumentedList` injetado pelo `relationship` de `orm.py` (linhas 101–105), quebrando o rastreamento de `cascade="all, delete-orphan"` do SQLAlchemy. Foi necessário atualizar a lista *in-place* com fatiamento (`self._lotes[:] = [instantaneo.reconstruir() for instantaneo in memento._lotes]`).
+
+### 3. Decisão final: Escolheria essa arquitetura de novo?
+
+**Decisão:** Para um projeto de produção real, **trocaria a combinação de microframework (Flask + mapeamento clássico manual) por uma arquitetura híbrida apoiada em um framework *full-stack* robusto (como Laravel, ou Django no ecossistema Python)**, mantendo classes de domínio ricas e padrões GoF apenas no núcleo de regras críticas.
+
+**Justificativa:**
+Conviver com a arquitetura do livro-texto (*Ports & Adapters* com mapeamento imperativo, repositórios abstratos, *Fake Repositories* e Flask puro) foi excelente do ponto de vista didático para exercitar TDD, SOLID (OCP) e GoF (Memento) em um domínio isolado. Contudo, na prática, pagamos um preço alto de *boilerplate* manual e de acoplamento invisível com o `map_imperatively`, sem contar com recursos essenciais para levar um sistema de venda de ingressos e eventos para produção (autenticação, controle de permissões de organizadores, migrações versionadas de banco, *jobs*/filas para pagamento, validação declarativa de payloads e transações atômicas nativas). Em um sistema real, utilizar um framework mais completo e opinativo como o **Laravel** (ou uma abordagem híbrida em um framework *full-stack* maduro) entregaria toda essa infraestrutura pronta e padronizada, permitindo concentrar o esforço de engenharia exclusivamente nas invariantes de negócio de `Evento`, `Lote`, `Inscricao` e `Pagamento`, sem precisar reinventar o encanamento arquitetural a cada rota.
+
+---
+
 ## Análise — Gabriela Bitencourt Freire da Silva (@gabibitencourt)
 
 - **Escopo avaliado:** Entidade `Participante`, Value Objects (`Documento` e `Email`) e hierarquia `Decorator` (`AbstractParticipante`, `ParticipanteDecorator`, `ParticipanteVIPDecorator`, `ParticipanteEstudanteDecorator`) em `src/eventos/domain/model.py` e `tests/unit/test_participante.py`.
