@@ -52,6 +52,12 @@ Este documento registra as contribuições individuais e as decisões de projeto
 - **Justificativa de decisão de projeto:** O Decorator evita a inflação de atributos booleanos na classe `Participante` e a explosão de subclasses, permitindo empilhar dinamicamente privilégios em tempo de execução sem impactar o esquema de persistência relacional.
 - **Uso de IA Generativa:** Suporte na modelagem das interfaces do Decorator e na documentação técnica.
 
+#### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
+- **Arquivos sob minha responsabilidade:** `docs/frameworks.md`, `docs/retrospectiva.md` e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:**
+- **O que implementei:** Elaboração da análise individual dos frameworks (Flask, SQLAlchemy e pytest) aplicada ao escopo de `Participante` em `docs/frameworks.md`, redação da retrospectiva arquitetural da Fase 2 em `docs/retrospectiva.md` e registro do autorrelato final com reflexão no `DECISIONS.md`.
+- **Justificativa de decisão de projeto:** Optamos por recomendar uma arquitetura híbrida na retrospectiva porque a Fase 2 evidenciou que o isolamento do domínio favorece refatorações SOLID e padrões GoF, mas o excesso de camadas e repositórios falsos gera custo desnecessário em fluxos puramente cadastrais.
+- **Uso de IA Generativa:** Utilização de assistente de IA para revisão estrutural dos tópicos exigidos no roteiro da Fase 2, organização dos argumentos técnicos da retrospectiva.
 ---
 
 ### Arthur Siqueira Campos Alexandrino (@devalexandrino)
