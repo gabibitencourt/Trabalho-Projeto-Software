@@ -126,7 +126,7 @@ usei para esclarecer conceitos de sobre a camada de serviço
 
 #### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
 - **Arquivos sob minha responsabilidade:** `docs/frameworks.md`, `docs/retrospectiva.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** `fcc48f98` _(adicionar o novo hash após commitar a retrospectiva e a reflexão)_
+- **Intervalo/Hashes de Commits:** `fcc48f98`, `9298b62`
 - **O que implementei:** Elaboração da análise arquitetural dos frameworks utilizados no sistema (`Flask`, `SQLAlchemy` e `pytest`) aplicada ao agregado `Evento` em `docs/frameworks.md`, redação da retrospectiva crítica da Fase 2 (revisitando os cenários de atributos de qualidade e o ADR-002 do Checkpoint 1 frente às evidências das refatorações OCP e Memento) em `docs/retrospectiva.md` e registro deste autorrelato e reflexão final em `DECISIONS.md`.
 - **Justificativa de decisão de projeto:** Na retrospectiva, defendi que para um sistema real de produção substituiríamos o conjunto microframework + mapeamento manual por uma solução híbrida apoiada em um framework *full-stack* robusto (como o Laravel), mantendo classes ricas e padrões GoF apenas no núcleo de regras críticas do domínio, pois o custo de *boilerplate* manual e de contornar detalhes do `map_imperatively` superou os benefícios nas operações periféricas.
 - **Uso de IA Generativa (conforme Seção 2):** Utilização de assistente de IA para organização da estrutura dos documentos `docs/frameworks.md` e `docs/retrospectiva.md`, mapeamento dos padrões internos do SQLAlchemy/Flask/pytest no código do agregado `Evento` e revisão textual do autorrelato.
