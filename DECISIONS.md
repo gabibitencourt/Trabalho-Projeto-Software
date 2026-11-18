@@ -241,7 +241,7 @@ Nenhuma.
 
 #### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
 - **Arquivos sob minha responsabilidade:** `docs/frameworks.md`, `docs/retrospectiva.md` e `DECISIONS.md`.
-- **Intervalo/Hashes de Commits:** commit atual
+- **Intervalo/Hashes de Commits:** 090e136
 - **O que implementei:** Análise detalhada de Flask, SQLAlchemy e pytest aplicada aos módulos de `Pagamento` e `CheckIn`/`Inscricao` em `docs/frameworks.md` (incluindo pontos de IoC, padrões internos dos frameworks e comparação com Django), retrospectiva arquitetural da Fase 2 em `docs/retrospectiva.md` e autorrelato final no `DECISIONS.md`.
 - **Justificativa de decisão de projeto:** Recomendei uma arquitetura híbrida na retrospectiva por equilibrar a testabilidade e o isolamento do domínio (essenciais para padrões como State e Observer) com a redução de código repetitivo nas camadas de repositório e controle transacional.
 - **Uso de IA Generativa (conforme Seção 2.5):** Utilização de assistente de IA para organizar os tópicos exigidos no roteiro final, revisar referências a arquivos/commits do repositório e estruturar os textos técnicos.
