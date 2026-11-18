@@ -321,14 +321,14 @@ Nenhuma.
 - **Intervalo/Hashes de Commits:** e3fc05d
 - **O que implementei:** Casos de uso de criar, consultar, confirmar e cancelar inscrição. Criei endpoints Flask correspondentes (POST /inscricoes, GET /inscricoes/<id>, POST /inscricoes/<id>/confirmar e POST /inscricoes/<id>/cancelar) e testes e2e que validam a criação, consulta, confirmação, cancelamento e o retorno 404 para inscrição inexistente.
 - **Justificativa de decisão de projeto:** Os fluxos foram concentrados na camada de serviço, que coordena o agregado e o repositório; o endpoint apenas interpreta a requisição, confirma a transação e serializa a resposta. A aplicação recebe uma sessão opcional para permitir testes e2e com SQLite em memória.
-- **Uso de IA Generativa:**
+- **Uso de IA Generativa:** Nenhum.
 
 #### Checkpoint 1 (22/10/2026) - Arquitetura e ADR-004
 - **Arquivos sob minha responsabilidade:** `docs/arquitetura.md` (seção Alternativa) e `docs/adr/004-unit-of-work-e-message-bus.md`.
 - **Intervalo/Hashes de Commits:** 6ead0be
 - **O que implementei:** Seção de Alternativa do documento de arquitetura, comparando a arquitetura atual com Unit of Work + Message Bus com eventos de domínio, e descartando Active Record. Escrevi o ADR-004, que propõe mover o commit das rotas Flask para a camada de serviço com uma Unit of Work e, em seguida, introduzir eventos de domínio e o Message Bus.
 - **Justificativa de decisão de projeto:** A Unit of Work vem antes do Message Bus porque resolve primeiro a lacuna transacional (commit nas rotas e inscrição criada sem consumir vaga do lote); introduzir o Message Bus antes adicionaria indireção sem resolver esse problema.
-- **Uso de IA Generativa (conforme Seção 2.5):**
+- **Uso de IA Generativa (conforme Seção 2.5):** Nenhum.
 
 #### Checkpoint 2 (03/11/2026) - Refatoração SOLID
 - **Arquivos sob minha responsabilidade:** `src/eventos/adapters/repository.py`, `src/eventos/service_layer/services.py`, `src/eventos/entrypoints/flask_app.py`, `tests/unit/test_services_inscricao.py` e `docs/solid.md`.
@@ -339,7 +339,15 @@ Nenhuma.
 
 #### Checkpoint 3 (10/11/2026) - Padrão GoF Factory Method
 - **Arquivos sob minha responsabilidade:** `src/eventos/domain/model.py` (`FabricaDeInscricao`, `FabricaInscricaoPaga` e `FabricaInscricaoCortesia`), `src/eventos/service_layer/services.py`, `src/eventos/entrypoints/flask_app.py`, `tests/unit/test_inscricao_factory.py`, `tests/e2e/test_inscricoes_api.py` e `docs/gof.md`.
-- **Intervalo/Hashes de Commits:** 0885326
+- **Intervalo/Hashes de Commits:** 0885326 (código e testes), bdf9896 (documentação)
 - **O que implementei:** Apliquei o padrão GoF Factory Method na criação da Inscricao. `services.criar_inscricao` passou a receber uma `FabricaDeInscricao`: `FabricaInscricaoPaga` cria a inscrição `PENDENTE` (padrão) e `FabricaInscricaoCortesia` cria a inscrição já `CONFIRMADA`, sem pagamento. A rota `POST /inscricoes` escolhe a fábrica pelo campo `cortesia`.
 - **Justificativa de decisão de projeto:** O Factory Method tira do caso de uso a decisão sobre o estado inicial de cada tipo de inscrição, e um novo tipo entra como uma nova fábrica. O produto continua sendo `Inscricao`, o que evita mapeamento polimórfico no SQLAlchemy e mudança no esquema do banco.
 - **Uso de IA Generativa (conforme Seção 2.5):** Apoio na implementação e na documentação; revisão e decisão final do autor.
+
+#### Entrega Final (17/11/2026) - Frameworks, Retrospectiva e Reflexão
+- **Arquivos sob minha responsabilidade:** `docs/frameworks.md` (seção do agregado `Inscricao`), `docs/retrospectiva.md` (minha análise) e `DECISIONS.md`.
+- **Intervalo/Hashes de Commits:** 505bb33
+- **O que implementei:** Em `docs/frameworks.md`, analisei Flask, SQLAlchemy e pytest no agregado `Inscricao`: três pontos de inversão de controle (rotas e `errorhandler` de `InscricaoNaoEncontradaError`, a fixture `client` e a reconstrução de `Inscricao` sem `__init__`) e três padrões internos localizados no código (Builder na `Query` de `listar_por_participante`, Unit of Work na `Session` usada por `SqlAlchemyInscricaoRepository.commit()` e Adapter no tipo `Enum(StatusInscricao)`). Em `docs/retrospectiva.md`, revisitei a minha seção Alternativa e o ADR-004 com dados do repositório: chamadas a `session.commit()` nas rotas caíram de 12 para 4, `inscricoes.lote` continua texto e `listar_por_evento` não existe em nenhum repositório real de inscrição.
+- **Justificativa de decisão de projeto:** Decidi manter a arquitetura em camadas, acrescentando a Unit of Work e o lote como chave estrangeira em vez de trocar de arquitetura, porque os problemas que encontrei no meu agregado foram de coordenação entre agregados, e não de excesso de camadas.
+- **Uso de IA Generativa (conforme Seção 2.5):** Usei o Claude (Claude Code) para levantar no repositório as evidências citadas (hashes, contagem de `session.commit()`, tempos das suítes)
+- **Reflexão final (150–300 palavras):** O que mais aprendi na Fase 2 foi a diferença entre uma arquitetura que parece desacoplada e uma que é desacoplada. No Checkpoint 1, escrevi que o domínio não dependia do SQLAlchemy porque usávamos mapeamento clássico. Na prática, o ORM reconstrói a `Inscricao` sem chamar o `__init__`, e isso decidiu onde as fábricas do Factory Method poderiam ficar. A dependência existia; só não aparecia nos `import`. Também aprendi que corrigir uma violação de SOLID pode ser feito em vários tamanhos. Na refatoração DIP, escolhi a versão pequena, um `commit()` no repositório, para não mexer no código dos colegas. Ela resolveu o meu agregado, mas espalhou o commit por cada repositório, e hoje `confirmar_inscricao_apos_pagamento` grava o pagamento só porque os repositórios dividem a mesma sessão. Foi a solução certa para o prazo, mas não para o sistema. Se fizesse de novo, implementaria a Unit of Work do ADR-004 logo no começo da Fase 2, antes dos padrões GoF, porque ela teria resolvido de uma vez o commit, a vaga do lote e o contrato de `listar_por_evento` que ficou faltando no meu repositório. Também escreveria um teste de contrato rodando a mesma bateria contra o `FakeInscricaoRepository` e o `SqlAlchemyInscricaoRepository`: o método ausente só apareceu como um `501` na API, e um teste desses o teria pego no Checkpoint 2. Por fim, aprendi a medir antes de opinar. Contar commits nas rotas e cronometrar as suítes mudou a minha conclusão: eu esperava defender uma troca de arquitetura, e os dados mostraram que faltava uma camada, não que sobrava.

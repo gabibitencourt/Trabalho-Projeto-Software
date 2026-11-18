@@ -108,3 +108,35 @@ Na prática, essa previsão se confirmou plenamente nos testes de domínio e ser
 **Decisão:** Adotaria uma **arquitetura híbrida**, mantendo o núcleo de domínio puro e simplificando a infraestrutura ao redor dele.
 
 **Justificativa:** Para agregados com regras de negócio críticas e múltiplos efeitos colaterais — como o ciclo de vida financeiro de `Pagamento`, a sincronização de status com `Inscricao` e as invariantes de `CheckIn` —, separar o domínio dos frameworks valeu a pena pela clareza das regras, facilidade de aplicar padrões (State e Observer) e rapidez dos testes unitários. Contudo, em uma próxima versão, eu substituiria os `FakeRepository` manuais por testes de integração diretos com SQLite em memória (eliminando código duplicado de consulta) e implementaria logo de início uma **Unit of Work** na camada de serviço para gerenciar transações que envolvem mais de um agregado (`Pagamento` + `Inscricao`) sem depender de `commit()` espalhado nas rotas ou nos repositórios individuais.
+
+---
+
+## Análise — Samuel Carvalho Dias (@SamuelCDiias)
+
+- **Escopo avaliado:** agregado `Inscricao` (`Inscricao`, `FabricaDeInscricao`, `FabricaInscricaoPaga` e `FabricaInscricaoCortesia` em `src/eventos/domain/model.py`), seus repositórios em `src/eventos/adapters/repository.py`, os casos de uso de inscrição em `src/eventos/service_layer/services.py` e as rotas `/inscricoes` em `src/eventos/entrypoints/flask_app.py`. Também revisito a seção **Alternativa** de `docs/arquitetura.md` e o **ADR-004**, ambos de minha autoria (commit `6ead0be`).
+
+### 1. Revisitação do Checkpoint 1 e trade-offs na prática
+
+No Checkpoint 1 eu comparei a arquitetura atual com **Unit of Work + Message Bus** e recomendei adotá-la de forma incremental, começando pela Unit of Work, porque as duas maiores lacunas eram o `session.commit()` nas rotas e a inscrição criada sem consumir vaga do lote. Com a mudança do enunciado, esses módulos deixaram de ser exigidos e a UoW não foi implementada. Mesmo assim, dá para conferir as previsões:
+
+- **Fronteira transacional nas rotas: confirmou-se e foi parcialmente corrigida.** O documento contava 12 chamadas a `session.commit()` em `flask_app.py`. Depois das refatorações DIP de inscrição (`9e5a6d8`, minha) e de pagamento (`d219773`, do Lucas), sobraram 4, todas fora das rotas de inscrição. A correção, porém, foi a versão pequena da minha própria proposta: um `commit()` em cada repositório, e não uma UoW. O custo apareceu em `services.confirmar_inscricao_apos_pagamento`, que só chama `repositorio_inscricao.commit()` e grava a mudança do pagamento por efeito colateral, porque os dois repositórios compartilham a mesma `Session` em `create_app`. A atomicidade entre agregados existe, mas por acaso da composição, não por contrato.
+- **Estoque do lote: confirmou-se e não foi resolvido.** A coluna `inscricoes.lote` continua `String(255)`. Isso limitou o meu padrão GoF: a `FabricaInscricaoCortesia` cria a inscrição já confirmada, mas nenhuma das duas fábricas consegue chamar `LoteDeIngresso.venda()`, porque a inscrição não tem um lote de verdade para chamar.
+- **Risco de contratos Fake/SQLAlchemy sem teste compartilhado: confirmou-se no meu módulo.** `services.encerrar_evento` chama `repositorio_inscricao.listar_por_evento`, mas esse método não existe em `AbstractInscricaoRepository`, em `FakeInscricaoRepository` nem em `SqlAlchemyInscricaoRepository`. Ele só existe no dublê escrito dentro de `tests/unit/test_services_evento.py`. Os testes de unidade passam, e a rota `POST /eventos/<id>/encerrar` responde `501` (`tests/e2e/test_eventos_api.py`). Foi exatamente o risco descrito na evidência 4 de `docs/arquitetura.md`.
+- **Testabilidade: confirmou-se.** A suíte unitária cresceu de 64 para 100 testes e roda em 0,08s; a e2e, com 19 testes, leva 0,33s.
+
+O trade-off que mais pesou na prática foi **testabilidade contra simplicidade na fronteira transacional**: o Fake tornou trivial testar que o caso de uso faz commit (`FakeInscricaoRepository.commitou`), mas cada agregado ganhou o seu próprio `commit()`, e ninguém testa a transação que envolve dois agregados.
+
+### 2. Evidências da Fase 2: onde as camadas facilitaram e onde atrapalharam
+
+- **Facilitaram:**
+  1. **Refatoração DIP (`9e5a6d8`):** a mudança tocou só as três camadas envolvidas (`repository.py` +11, `services.py` +3, `flask_app.py` −3) mais o teste novo `tests/unit/test_services_inscricao.py`. Os 6 testes e2e de inscrição que já existiam continuaram passando sem alteração, o que comprovou que o comportamento HTTP não mudou.
+  2. **Factory Method (`0885326`):** as fábricas entraram em `model.py` (+18 linhas), e `criar_inscricao` ganhou um parâmetro com valor padrão. Por isso, as chamadas antigas e os testes de `test_services_inscricao.py` não mudaram, e `orm.py` não foi tocado. Os 5 testes de unidade novos rodam sem banco.
+- **Atrapalharam:**
+  1. **Uma regra pequena atravessa todas as camadas.** "Inscrição de cortesia nasce confirmada" é uma regra de duas linhas, mas exigiu mudar domínio, serviço, rota e dois arquivos de teste: foram 5 arquivos no commit `0885326`, sendo 3 de produção.
+  2. **O ORM restringe o domínio.** Como o SQLAlchemy reconstrói `Inscricao` sem chamar `__init__`, nenhuma regra de criação pode morar no construtor. As fábricas ficaram como classes separadas também por esse motivo, e não só por causa do padrão.
+
+### 3. Decisão final: escolheria essa arquitetura de novo?
+
+**Decisão:** sim, **manteria a arquitetura em camadas com domínio puro**, com duas mudanças desde o início: **uma Unit of Work na camada de serviço** e **o lote referenciado por chave estrangeira** em `inscricoes`.
+
+**Justificativa:** no agregado `Inscricao`, as camadas cumpriram o que prometeram. A refatoração SOLID e o padrão GoF entraram sem tocar no esquema do banco e foram validados por testes que rodam em milissegundos. Os problemas que encontrei não vieram de ter camadas demais, e sim de uma camada que faltou: os três problemas da seção 1 (commit por repositório, estoque do lote ignorado e contrato `listar_por_evento` ausente) são todos de **coordenação entre agregados**, que é justamente o papel da Unit of Work proposta no ADR-004. Trocar por Active Record ou Django reduziria o código de mapeamento, mas não resolveria a coordenação, e custaria a velocidade da suíte unitária, que é o atributo de maior prioridade em `docs/arquitetura.md`. Eu não adotaria o Message Bus: com um único processo síncrono e seis agregados, a indireção dos eventos não se pagou nem na Fase 2, quando o requisito foi removido.
